@@ -1,0 +1,70 @@
+{
+ "prompt": "regenerate the repo health report in REPORT.md",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"ls -la && cat REPORT.md README* 2>/dev/null; git log --stat -5 | head -60\", \"description\": \"Inspect repo files and history\"}"
+  },
+  {
+   "tool": "Skill",
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"regenerate the repo health report in REPORT.md\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"MM=/Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py; python3 $MM match \\\"regenerate the repo health report in REPORT.md\\\"; python3 $MM list --all\", \"description\": \"Check for an existing matching reflex\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"wc -l src/* web/*; grep -nE \\\"TODO|FIXME|XXX|HACK\\\" -r src web; head -20 src/mod1.py; git show HEAD | head -20\", \"description\": \"Collect file sizes, TODO markers, and sample code\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/repo-health-report.sh <<'EOF'\\n#!/usr/bin/env bash\\n# Regenerate repo health report. Args: [output=REPORT.md] [commits=10]\\nset -euo pipefail\\nOUT=\\\"${1:-REPORT.md}\\\"; N=\\\"${2:-10}\\\"\\nFILES=$(git ls-files | grep -v \\\"^${OUT}$\\\" || true)\\nSRC=$(echo \\\"$FILES\\\" | grep -E '\\\\.(py|ts|tsx|js|jsx|go|rs|java|rb|sh)$' || true)\\nNFILES=$(echo \\"
+  },
+  {
+   "text": "I've regenerated `REPORT.md` from the current state of the repo (commit `88dd064`). It has four sections: summary, files, recent commits and findings.\n\n- **Summary:** 7 tracked files, 6 of them source files with 581 lines in total. There are 3 commits, 1 contributor, and the working tree is clean.\n- **Findings:**\n  - There are no test files.\n  - There is no `LICENSE` or `.gitignore`.\n  - `README.m"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.1456094,
+   "num_turns": 7,
+   "duration_ms": 30388,
+   "usage": {
+    "input_tokens": 14,
+    "cache_creation_input_tokens": 5921,
+    "cache_read_input_tokens": 209627,
+    "output_tokens": 2813,
+    "output_tokens_details": {
+     "thinking_tokens": 291
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 5921,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 448,
+      "cache_read_input_tokens": 36871,
+      "cache_creation_input_tokens": 2222,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 2222
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I've regenerated `REPORT.md` from the current state of the repo (commit `88dd064`). It has four sections: summary, files, recent commits and findings.\n\n- **Summary:** 7 tracked files, 6 of them source files with 581 lines in total. There are 3 commits, 1 contributor, and the working tree is clean.\n- **Findings:**\n  - There are no test files.\n  - There is no `LICENSE` or `.gitignore`.\n  - `README.md` is only 3 lines.\n  - The largest file is `src/mod4.py` at 160 lines.\n  - There are no TODO or FIXME markers.\n\nThere was no earlier `REPORT.md` and no generator script to start from. I built the layout from muscle-memory's one-line note of the two previous runs, which only named the sections, so the formatting may not match what you had before. Tell me if it should look different.\n\nThis was the third time this task was run, so I saved it as a reusable script under the name `repo-health-report`. Next time it can be rerun with `python3 <mm.py> run repo-health-report`, which takes an optional output file (default `REPORT.md`) and number of commits (default 10).\n\nI haven't committed `REPORT.md`; say if you want me to."
+  }
+ ]
+}

@@ -50,9 +50,9 @@ THRESHOLD = env_int("MUSCLE_MEMORY_THRESHOLD", 3)          # manual runs before 
 INSTINCT_AFTER = env_int("MUSCLE_MEMORY_INSTINCT_AFTER", 3)  # clean no-arg reflex runs before eligible
 MIN_CALLS = env_int("MUSCLE_MEMORY_MIN_CALLS", 3)          # tool calls before a turn counts as a task
 ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "1") != "0"
-HINT_COVERAGE = 0.5    # share of the prompt's words that must belong to the task for a reflex hint
-COUNT_COVERAGE = 0.6   # stricter share for silently counting a turn as a known task
-MIN_SHARED = 2         # and at least this many shared words, for both
+# Overlap = shared words / the smaller of (prompt words, task words), so long detailed prompts still match.
+HINT_OVERLAP, HINT_SHARED = 0.5, 2     # to suggest a reflex to Claude
+COUNT_OVERLAP, COUNT_SHARED = 0.6, 3   # stricter, to silently count a turn as a known task
 INSTINCT_MAX_WORDS = 12
 INSTINCT_TIMEOUT = 110
 MAX_PHRASINGS = 10
@@ -213,16 +213,16 @@ def vocab(entry, key):
     return toks(" ".join(entry.get("triggers", [])) + " " + key.replace("-", " ") + " " + entry.get("summary", ""))
 
 
-def coverage(text, entry, key):
-    """(share of the prompt's words that belong to the task, number of shared words)."""
-    t = toks(text)
-    shared = t & vocab(entry, key)
-    return (len(shared) / len(t) if t else 0.0), len(shared)
+def overlap(text, entry, key):
+    """(shared words / the smaller word set, number of shared words)."""
+    t, v = toks(text), vocab(entry, key)
+    shared = t & v
+    return (len(shared) / min(len(t), len(v)) if t and v else 0.0), len(shared)
 
 
-def is_match(text, entry, key, min_coverage):
-    cov, shared = coverage(text, entry, key)
-    return cov >= min_coverage and shared >= MIN_SHARED
+def is_match(text, entry, key, min_overlap, min_shared):
+    ov, shared = overlap(text, entry, key)
+    return ov >= min_overlap and shared >= min_shared
 
 
 def instinct_match(text, entry):
@@ -235,15 +235,15 @@ def instinct_match(text, entry):
     return any(t == toks(p) for p in entry.get("approved_phrasings", []))
 
 
-def find(project, text, need_reflex=True, min_coverage=HINT_COVERAGE):
-    """Best (scope, key, entry, coverage) in this project or global; project wins ties."""
+def find(project, text, need_reflex=True, min_overlap=HINT_OVERLAP, min_shared=HINT_SHARED):
+    """Best (scope, key, entry, overlap) in this project or global; project wins ties."""
     best = None
     for scope in (project, GLOBAL):
         for k, e in read(scope).items():
             if need_reflex and not e.get("reflex"):
                 continue
-            if is_match(text, e, k, min_coverage):
-                cov = coverage(text, e, k)[0]
+            if is_match(text, e, k, min_overlap, min_shared):
+                cov = overlap(text, e, k)[0]
                 if best is None or cov > best[3]:
                     best = (scope, k, e, cov)
     return best
@@ -562,7 +562,7 @@ def stop_hook(data):
     if len(work) < MIN_CALLS:
         return
     project = project_root(data.get("cwd"))
-    m = find(project, prompt, need_reflex=False, min_coverage=COUNT_COVERAGE)
+    m = find(project, prompt, need_reflex=False, min_overlap=COUNT_OVERLAP, min_shared=COUNT_SHARED)
     if m and m[2].get("reflex"):
         return  # a reflex existed and Claude chose not to use it; nothing to learn
     if m:
@@ -649,7 +649,7 @@ def main(argv):
                 print("no reflex")
                 return 0
             s, k, e, cov = m
-            print(f"REFLEX {k} ({e['reflex']}) coverage={cov:.2f} scope={'global' if s == GLOBAL else 'project'} "
+            print(f"REFLEX {k} ({e['reflex']}) overlap={cov:.2f} scope={'global' if s == GLOBAL else 'project'} "
                   f"instinct={bool(e.get('instinct'))} uses={e.get('uses', 0)} fails={e.get('fails', 0)}")
             print(f"summary: {e.get('summary', '')}")
             print(f"run: python3 {SELF} run {k}")

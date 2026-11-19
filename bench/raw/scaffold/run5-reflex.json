@@ -1,0 +1,58 @@
+{
+ "prompt": "scaffold a exports module with a test",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git ls-files; echo ---; for f in $(git ls-files); do echo \\\"== $f\\\"; cat \\\"$f\\\"; done\", \"description\": \"List tracked files and show contents\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat > src/exports.py <<'EOF'\\n\\\"\\\"\\\"Exports module.\\\"\\\"\\\"\\n\\n\\ndef run():\\n    return \\\"exports\\\"\\nEOF\\ncat > tests/test_exports.py <<'EOF'\\nimport unittest\\nfrom src import exports\\n\\n\\nclass T(unittest.TestCase):\\n    def test_run(self):\\n        self.assertEqual(exports.run(), 'exports')\\nEOF\\npython3 -m unittest -v 2>&1 | tail -6\", \"description\": \"Create exports module and test, r"
+  },
+  {
+   "text": "I added an `exports` module and a test for it, built the same way as the existing `core` module. Both tests pass when run with `python3 -m unittest`.\n\n- `src/exports.py` has a placeholder `run()` that returns `\"exports\"`.\n- `tests/test_exports.py` checks that `exports.run()` returns `\"exports\"`.\n\nI haven't committed anything."
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.19338720000000004,
+   "num_turns": 3,
+   "duration_ms": 8204,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 20869,
+    "cache_read_input_tokens": 79456,
+    "output_tokens": 526,
+    "output_tokens_details": {
+     "thinking_tokens": 73
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 20869,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 143,
+      "cache_read_input_tokens": 33453,
+      "cache_creation_input_tokens": 275,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 275
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an `exports` module and a test for it, built the same way as the existing `core` module. Both tests pass when run with `python3 -m unittest`.\n\n- `src/exports.py` has a placeholder `run()` that returns `\"exports\"`.\n- `tests/test_exports.py` checks that `exports.run()` returns `\"exports\"`.\n\nI haven't committed anything."
+  }
+ ]
+}

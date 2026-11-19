@@ -1,0 +1,58 @@
+{
+ "prompt": "Prepend an Unreleased section to CHANGELOG.md listing commits since the last tag, grouped by conventional-commit type (features, fixes, docs; no chores).",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git tag --sort=-creatordate | head; git describe --tags --abbrev=0; git log --oneline --decorate | head -20; head -30 CHANGELOG.md\", \"description\": \"Inspect tags, log, and changelog\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat > /tmp/cl_head.md <<'EOF'\\n# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- **api:** pagination support (a2795b4)\\n- add export command (e118003)\\n\\n### Fixes\\n\\n- **cli:** exit code on error (dc252fd)\\n- crash on empty input (788495a)\\n\\n### Docs\\n\\n- usage examples (0e9d963)\\nEOF\\ntail -n +2 CHANGELOG.md >> /tmp/cl_head.md && mv /tmp/cl_head.md CHANGELOG.md && cat CHANGELOG.md "
+  },
+  {
+   "text": "I added an `## Unreleased` section to `CHANGELOG.md`, just above `## v0.1.0`. It lists the five commits made since the `v0.1.0` tag:\n\n- **Features:** api pagination support (a2795b4) and the new export command (e118003)\n- **Fixes:** cli exit code on error (dc252fd) and the crash on empty input (788495a)\n- **Docs:** usage examples (0e9d963)\n\nI left out `chore: bump deps` as you asked. Each entry en"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.1971262,
+   "num_turns": 3,
+   "duration_ms": 8514,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 21089,
+    "cache_read_input_tokens": 79651,
+    "output_tokens": 623,
+    "output_tokens_details": {
+     "thinking_tokens": 0
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 21089,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 212,
+      "cache_read_input_tokens": 33542,
+      "cache_creation_input_tokens": 405,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 405
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an `## Unreleased` section to `CHANGELOG.md`, just above `## v0.1.0`. It lists the five commits made since the `v0.1.0` tag:\n\n- **Features:** api pagination support (a2795b4) and the new export command (e118003)\n- **Fixes:** cli exit code on error (dc252fd) and the crash on empty input (788495a)\n- **Docs:** usage examples (0e9d963)\n\nI left out `chore: bump deps` as you asked. Each entry ends with its short commit hash, and a commit with a scope like `api` shows that scope in bold at the start. The change hasn't been committed yet."
+  }
+ ]
+}

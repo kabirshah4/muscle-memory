@@ -1,0 +1,58 @@
+{
+ "prompt": "Add the commits since the latest tag to CHANGELOG.md as an Unreleased section grouped by type (Features / Fixes / Documentation). Leave older entries untouched and ignore chores.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git tag --sort=-creatordate; git describe --tags --abbrev=0; git log --oneline $(git describe --tags --abbrev=0)..HEAD; cat CHANGELOG.md\", \"description\": \"Find latest tag, commits since, and changelog\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat > CHANGELOG.md <<'EOF'\\n# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- **api:** pagination support\\n- add export command\\n\\n### Fixes\\n\\n- **cli:** exit code on error\\n- crash on empty input\\n\\n### Documentation\\n\\n- usage examples\\n\\n## v0.1.0\\n\\n- Initial release\\nEOF\\ngit diff --stat\", \"description\": \"Write Unreleased section to changelog\"}"
+  },
+  {
+   "text": "I added an `## Unreleased` section to the top of `CHANGELOG.md` covering the 6 commits since `v0.1.0`, the latest tag:\n\n- **Features:** `api` pagination support; add export command\n- **Fixes:** `cli` exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out `chore: bump deps`. The `v0.1.0` entry is unchanged; the change is 16 added lines and nothing removed. I haven'"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.193269,
+   "num_turns": 3,
+   "duration_ms": 8043,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 20907,
+    "cache_read_input_tokens": 79645,
+    "output_tokens": 503,
+    "output_tokens_details": {
+     "thinking_tokens": 0
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 20907,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 164,
+      "cache_read_input_tokens": 33528,
+      "cache_creation_input_tokens": 237,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 237
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an `## Unreleased` section to the top of `CHANGELOG.md` covering the 6 commits since `v0.1.0`, the latest tag:\n\n- **Features:** `api` pagination support; add export command\n- **Fixes:** `cli` exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out `chore: bump deps`. The `v0.1.0` entry is unchanged; the change is 16 added lines and nothing removed. I haven't committed it."
+  }
+ ]
+}

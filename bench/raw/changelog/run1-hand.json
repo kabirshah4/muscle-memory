@@ -1,0 +1,58 @@
+{
+ "prompt": "Update CHANGELOG.md with every commit since the last git tag, grouped into Features, Fixes and Documentation, under a new 'Unreleased' heading above the existing entries. Skip chore commits.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git tag --sort=-creatordate | head; git describe --tags --abbrev=0; echo ---; git log --oneline $(git describe --tags --abbrev=0)..HEAD; echo ---; cat CHANGELOG.md\", \"description\": \"Find last tag, commits since, and changelog\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat > CHANGELOG.md <<'EOF'\\n# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- **api:** pagination support\\n- add export command\\n\\n### Fixes\\n\\n- **cli:** exit code on error\\n- crash on empty input\\n\\n### Documentation\\n\\n- usage examples\\n\\n## v0.1.0\\n\\n- Initial release\\nEOF\\ngit diff --stat\", \"description\": \"Write Unreleased section to changelog\"}"
+  },
+  {
+   "text": "I added an \"Unreleased\" section to `CHANGELOG.md`, above the existing v0.1.0 entry. It covers the commits since the last tag, `v0.1.0`:\n\n- **Features:** **api:** pagination support; add export command\n- **Fixes:** **cli:** exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out the `chore: bump deps` commit as you asked. Commit scopes like `api` and `cli` are shown"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.20923879999999997,
+   "num_turns": 3,
+   "duration_ms": 7523,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 22897,
+    "cache_read_input_tokens": 77694,
+    "output_tokens": 525,
+    "output_tokens_details": {
+     "thinking_tokens": 0
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 22897,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 175,
+      "cache_read_input_tokens": 33546,
+      "cache_creation_input_tokens": 237,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 237
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an \"Unreleased\" section to `CHANGELOG.md`, above the existing v0.1.0 entry. It covers the commits since the last tag, `v0.1.0`:\n\n- **Features:** **api:** pagination support; add export command\n- **Fixes:** **cli:** exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out the `chore: bump deps` commit as you asked. Commit scopes like `api` and `cli` are shown in bold before each entry. I haven't committed the change."
+  }
+ ]
+}

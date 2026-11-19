@@ -34,6 +34,7 @@ def summary(rows):
             res[task][ph] = dict(
                 cost=med(ran, "cost_usd"), calls=med(ran, "tool_calls"), secs=med(ran, "duration_s"),
                 ok=f"{sum(r['ok'] == 'True' for r in ran)}/{len(ran)}", n=len(ran),
+                used=f"{sum(r.get('used_reflex') == 'True' for r in ran)}/{len(ran)}",
                 note=next((r["note"] for r in rs if r["note"]), ""))
     return res
 
@@ -54,15 +55,16 @@ def markdown(res):
             if not s or not s["n"]:
                 cells.append("n/a" if p == "instinct" else "—")
             else:
-                cells.append(f"{fmt(s['cost'], 'cost')} · {fmt(s['secs'], 'secs')} · ✓{s['ok']}")
+                used = f" · used {s['used']}" if p in ("reflex", "instinct") else ""
+                cells.append(f"{fmt(s['cost'], 'cost')} · {fmt(s['secs'], 'secs')} · ✓{s['ok']}{used}")
         r, c = ph.get("reflex", {}).get("cost"), ph.get("control", {}).get("cost")
         delta = f"{(1 - r / c) * 100:+.0f}% cheaper" if r is not None and c else "—"
         if r is not None and c and r > c:
             delta = f"{(r / c - 1) * 100:.0f}% dearer"
         lines.append(f"| {task} | " + " | ".join(cells) + f" | {delta} |")
     lines.append("")
-    lines.append("Cells: median cost · median time · runs with correct output. "
-                 "Control = same prompt as reflex runs, plugin off.")
+    lines.append("Cells: median cost · median time · runs with correct output · runs where a reflex or instinct "
+                 "was actually used. Control = same prompt as reflex runs, plugin off.")
     return "\n".join(lines)
 
 

@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-19",
+  "claude_cli": "2.1.328 (Claude Code)",
+  "model": "CLI default",
+  "plugin_commit": "a65ce8b",
+  "platform": "macOS-27.3-arm64-arm-64bit-Mach-O",
+  "tasks": [
+    "report",
+    "changelog",
+    "csv",
+    "scaffold"
+  ]
+}

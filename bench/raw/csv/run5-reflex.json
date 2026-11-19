@@ -1,0 +1,77 @@
+{
+ "prompt": "redo the csv summary in data/summary.json",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git ls-files && ls -la data; cat data/summary.json 2>/dev/null; for f in $(git ls-files '*.csv'); do echo \\\"== $f\\\"; wc -l \\\"$f\\\"; head -5 \\\"$f\\\"; done\", \"description\": \"List repo files and preview CSVs and summary\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat -A data/sales.csv | tail -3; cat -A data/users.csv | tail -2; git log --all --oneline -- data/summary.json\", \"description\": \"Check full CSV contents and summary.json history\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat -e data/sales.csv data/users.csv\", \"description\": \"Show CSV contents with line endings\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"python3 -I - <<'EOF'\\nimport csv, json\\nfrom collections import Counter\\ndef summarize(path):\\n    rows = list(csv.DictReader(open(path, newline='')))\\n    cols = list(rows[0].keys())\\n    out = {\\\"rows\\\": len(rows), \\\"columns\\\": {}}\\n    for c in cols:\\n        vals = [r[c] for r in rows]\\n        try:\\n            nums = [float(v) for v in vals]\\n            out[\\\"columns\\\"][c] = {\\"
+  },
+  {
+   "text": "I wrote `data/summary.json` from scratch. There was no earlier version to redo: the file wasn't in the working tree or anywhere in git history, which only holds the commit that added the two CSVs. So I couldn't match any format you had before.\n\nWhat it contains:\n\n- **`sales.csv`** (5 rows): sales per region, with `north` appearing twice. Units range from 3 to 20 (mean 10.2) and prices from 8.25 to"
+  },
+  {
+   "tool": "Skill",
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"compile csv-summary-json\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/csv-summary-json.py <<'EOF'\\n#!/usr/bin/env python3\\n\\\"\\\"\\\"Summarize every CSV in a dir into one JSON file. Args: [data_dir=data] [out=<data_dir>/summary.json]\\\"\\\"\\\"\\nimport csv, glob, json, os, sys\\nfrom collections import Counter\\n\\ndata_dir = sys.argv[1] if len(sys.argv) > 1 else \\\"data\\\"\\nout_path = sys.argv[2] if len(sys.argv) > 2"
+  },
+  {
+   "text": "The CSV summary task is now saved as a reusable script under the name `csv-summary-json`. Next time you ask for this summary, it runs the script instead of redoing the work by hand.\n\n- **What it does:** it summarizes every `*.csv` in a folder into one JSON file, in the same format I made earlier. Number columns get min, max, mean and sum; text columns get counts per value. Any CSV with `region`, `"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.1752166,
+   "num_turns": 9,
+   "duration_ms": 37812,
+   "usage": {
+    "input_tokens": 18,
+    "cache_creation_input_tokens": 6264,
+    "cache_read_input_tokens": 277663,
+    "output_tokens": 3475,
+    "output_tokens_details": {
+     "thinking_tokens": 382
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 6264,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 304,
+      "cache_read_input_tokens": 38010,
+      "cache_creation_input_tokens": 1400,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 1400
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "The CSV summary task is now saved as a reusable script under the name `csv-summary-json`. Next time you ask for this summary, it runs the script instead of redoing the work by hand.\n\n- **What it does:** it summarizes every `*.csv` in a folder into one JSON file, in the same format I made earlier. Number columns get min, max, mean and sum; text columns get counts per value. Any CSV with `region`, `units` and `price` columns also gets revenue by region and a total. It prints a one-line confirmation when done.\n- **Defaults:** with no arguments it reads `data/` and writes `data/summary.json`. You can pass a different folder or output path.\n- **Checked:** I ran it on your data and its output matched the `data/summary.json` from earlier exactly. That run rewrote the file with the same content, and it's still not committed."
+  }
+ ]
+}

@@ -335,6 +335,13 @@ class StopHook(Base):
         self.assertEqual(self.stop("set up the database fixtures", 5).strip(), "")  # not asked again
         self.assertIn("seen=3 ", self.mm("list"))
 
+    def test_long_detailed_prompt_for_known_task_is_counted(self):
+        self.mm("log", "csv-summary", "summarize every csv in data into data/summary.json",
+                "--triggers", "csv,summary,json,data,rows,columns")
+        self.stop("Write data/summary.json describing each CSV under data/: number of rows, columns, and min, "
+                  "max and mean of every numeric column.", 5)
+        self.assertIn("seen=2 ", self.mm("list"))
+
     def test_unrelated_task_with_one_shared_word_is_not_counted(self):
         self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
         self.stop("setup ci pipeline caching", 5, sid="x")

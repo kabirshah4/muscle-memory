@@ -25,6 +25,7 @@ import json
 import os
 import platform
 import pty
+import re
 import shutil
 import subprocess
 import sys
@@ -39,7 +40,7 @@ sys.path.insert(0, HERE)
 from tasks import TASKS  # noqa: E402
 
 DISABLE_INSTALLED = json.dumps({"enabledPlugins": {"muscle-memory@muscle-memory": False}})
-FIELDS = ["task", "run", "phase", "ok", "cost_usd", "output_tokens", "cache_read_tokens",
+FIELDS = ["task", "run", "phase", "used_reflex", "state_before", "ok", "cost_usd", "output_tokens", "cache_read_tokens",
           "cache_write_tokens", "input_tokens", "tool_calls", "duration_s", "note"]
 
 
@@ -97,14 +98,18 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
     os.makedirs(os.path.dirname(raw_path), exist_ok=True)
     with open(raw_path, "w") as f:
         json.dump({"prompt": prompt, "plugin": plugin, "events": condense(p.stdout)}, f, indent=1)
-    calls, result = 0, {}
+    calls, result, used = 0, {}, False
     for line in p.stdout.splitlines():
         try:
             m = json.loads(line)
         except json.JSONDecodeError:
             continue
         if m.get("type") == "assistant":
-            calls += sum(1 for c in m["message"]["content"] if c.get("type") == "tool_use")
+            for c in m["message"]["content"]:
+                if c.get("type") == "tool_use":
+                    calls += 1
+                    if re.search(r"(mm\.py|\$\{?MM\}?)\W+run\b", json.dumps(c.get("input", {}))):
+                        used = True
         elif m.get("type") == "result":
             result = m
     u = result.get("usage") or {}
@@ -115,6 +120,7 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
         "cache_write_tokens": u.get("cache_creation_input_tokens", 0),
         "input_tokens": u.get("input_tokens", 0),
         "tool_calls": calls,
+        "used_reflex": used or (not calls and bool(result)),  # 0 calls + a result = the instinct answered
         "duration_s": round(dur, 1),
         "note": "" if result else f"no result (exit {p.returncode}): {p.stderr[-200:]}",
     }
@@ -169,10 +175,11 @@ def run_task(name, model, root, raw_dir):
 
     def record(run, phase, prompt, plugin, st, cwd):
         reset(cwd)
+        state = " / ".join(l.strip() for l in mm(st, cwd, "list").splitlines() if not l.startswith("["))[:200]
         r = claude(cwd, prompt, st, plugin, model, os.path.join(raw_dir, name, f"run{run}-{phase}.json"))
-        r.update(task=name, run=run, phase=phase, ok=task["check"](cwd, run))
+        r.update(task=name, run=run, phase=phase, ok=task["check"](cwd, run), state_before=state)
         rows.append(r)
-        print(f"[{name}] run {run:<2} {phase:<8} ok={r['ok']!s:<5} ${r['cost_usd']:.3f} "
+        print(f"[{name}] run {run:<2} {phase:<8} ok={r['ok']!s:<5} used_reflex={r['used_reflex']!s:<5} ${r['cost_usd']:.3f} "
               f"calls={r['tool_calls']} {r['duration_s']}s {r['note']}", flush=True)
 
     for i, prompt in enumerate(task["hand_prompts"], 1):

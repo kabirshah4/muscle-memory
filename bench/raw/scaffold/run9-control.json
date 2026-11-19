@@ -1,0 +1,65 @@
+{
+ "prompt": "scaffold a quota module with a test",
+ "plugin": false,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git ls-files | head -50; echo ---; cat package.json pyproject.toml 2>/dev/null | head -40\", \"description\": \"List tracked files and project config\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat src/core.py tests/test_core.py src/__init__.py tests/__init__.py\", \"description\": \"Show existing module and test\"}"
+  },
+  {
+   "text": "Matching the existing `core` pattern:"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat > src/quota.py <<'EOF'\\n\\\"\\\"\\\"Quota module.\\\"\\\"\\\"\\n\\n\\ndef run():\\n    return \\\"quota\\\"\\nEOF\\ncat > tests/test_quota.py <<'EOF'\\nimport unittest\\nfrom src import quota\\n\\n\\nclass T(unittest.TestCase):\\n    def test_run(self):\\n        self.assertEqual(quota.run(), 'quota')\\nEOF\\npython3 -m unittest discover -s tests -t . -v\", \"description\": \"Create quota module and test, run tests"
+  },
+  {
+   "text": "I added a quota module and a test for it, set up the same way as the existing `core` module. Both tests pass.\n\n- `src/quota.py` has a placeholder `run()` that returns `\"quota\"`.\n- `tests/test_quota.py` checks that `run()` returns `\"quota\"`.\n\nThere's no actual quota logic yet. I haven't committed anything."
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.20286780000000001,
+   "num_turns": 4,
+   "duration_ms": 9992,
+   "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 20977,
+    "cache_read_input_tokens": 112899,
+    "output_tokens": 622,
+    "output_tokens_details": {
+     "thinking_tokens": 60
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 20977,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 131,
+      "cache_read_input_tokens": 33529,
+      "cache_creation_input_tokens": 309,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 309
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added a quota module and a test for it, set up the same way as the existing `core` module. Both tests pass.\n\n- `src/quota.py` has a placeholder `run()` that returns `\"quota\"`.\n- `tests/test_quota.py` checks that `run()` returns `\"quota\"`.\n\nThere's no actual quota logic yet. I haven't committed anything."
+  }
+ ]
+}
