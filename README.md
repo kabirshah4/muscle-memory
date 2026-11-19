@@ -4,8 +4,9 @@
 
 **Do a task enough times and Claude stops thinking about it.**
 
-A Claude Code plugin that turns your repeated tasks into reflexes,<br>
-and your proven reflexes into instincts that run with **zero tokens**.
+A Claude Code plugin that **cuts token usage and cost** on work you repeat:<br>
+repeated tasks become saved scripts, and the ones you approve run with **zero tokens**.<br>
+<sub>Also works with Codex CLI, Gemini CLI and Cursor.</sub>
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
 ![version](https://img.shields.io/badge/version-0.6.2-2a78d6)
