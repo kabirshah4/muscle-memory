@@ -231,8 +231,9 @@ def main():
                 results = list(ex.map(lambda n: run_task(n, a.model, root, raw_dir), names))
         except BenchAborted as err:
             sys.exit(f"benchmark aborted, results.csv left unchanged: {err}")
-        shutil.rmtree(os.path.join(HERE, "raw"), ignore_errors=True)
-        shutil.copytree(raw_dir, os.path.join(HERE, "raw"))
+        dest = os.path.join(HERE, os.path.basename(os.path.splitext(a.out)[0]).replace("results", "raw", 1))
+        shutil.rmtree(dest, ignore_errors=True)  # results.csv -> raw/, results-sonnet.csv -> raw-sonnet/
+        shutil.copytree(raw_dir, dest)
     finally:
         if a.keep:
             print("kept", root)
