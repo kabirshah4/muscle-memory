@@ -2,7 +2,12 @@
   "date": "2026-11-19",
   "claude_cli": "2.1.328 (Claude Code)",
   "model": "claude-haiku-5-5",
-  "plugin_commit": "60d2a46",
+  "plugin_commit": {
+    "report": "60d2a46",
+    "changelog": "60d2a46",
+    "csv": "60d2a46",
+    "scaffold": "14cdb3b"
+  },
   "platform": "macOS-27.3-arm64-arm-64bit-Mach-O",
   "tasks": [
     "report",
@@ -10,5 +15,5 @@
     "csv",
     "scaffold"
   ],
-  "note": "scaffold rows re-run after the generic-summary fix (commit 14cdb3b); other tasks from plugin_commit"
+  "plugin_commit_note": "scaffold was re-run after the generic-summary fix in 14cdb3b; the other tasks are from the full run at 60d2a46"
 }

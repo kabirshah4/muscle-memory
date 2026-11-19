@@ -147,7 +147,7 @@ Reflexes are scripts that Claude writes and runs on your machine. They stay loca
 
 - ✅ 2 clean runs as a reflex first
 - ✅ **your explicit approval** in an interactive terminal after seeing the script (`mm promote <key>`), pinned to its sha256 hash. The hash covers that one file only, not other scripts it calls.
-- ✅ an exact match: the prompt must use the same words as a wording you approved, be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
+- ✅ an exact match: the prompt must use the same words, in the same order, as a wording you approved (filler words like "the" are ignored), be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
 - ✅ the right project (or an explicit `--global`)
 
 They're demoted on the first failure. Review yours with `mm list` and `mm show` now and then.
@@ -164,7 +164,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 47 end-to-end tests
+python3 -m unittest discover -v tests   # 50 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

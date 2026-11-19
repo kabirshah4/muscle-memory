@@ -131,6 +131,20 @@ def read(scope, strict=False):
             data = json.load(f)
         if not isinstance(data, dict) or not all(isinstance(v, dict) for v in data.values()):
             raise ValueError("expected an object of task objects")
+        for e in data.values():  # tolerate hand-edited entries with wrong field types
+            for f, kind, default in (("triggers", list, []), ("summary", str, ""), ("phrasings", list, []),
+                                     ("templates", list, []), ("approved_phrasings", list, []),
+                                     ("approved_templates", list, [])):
+                if f in e and not isinstance(e[f], kind):
+                    e[f] = default
+            for f in ("triggers", "phrasings", "templates", "approved_phrasings", "approved_templates"):
+                if f in e:
+                    e[f] = [x for x in e[f] if isinstance(x, str)]
+            if e.get("reflex") is not None and not isinstance(e["reflex"], str):
+                e["reflex"] = None
+            for f in ("count", "uses", "fails", "streak"):
+                if f in e and not isinstance(e[f], int):
+                    e[f] = 0
     except (OSError, ValueError) as err:
         if strict:
             raise StoreError(f"{p} is unreadable ({err}). Nothing was changed. Fix it, or move it "
@@ -272,6 +286,11 @@ def template_args(text, tpl):
     return [args[i] for i in sorted(args)]
 
 
+def seq(text):
+    """Content words in order: 'deploy the worker' -> ['deploy', 'worker']. Filler words are ignored, order is not."""
+    return [t for t in re.findall(r"[^\W_]+", (text or "").lower()) if t not in STOP and len(t) > 1]
+
+
 def instinct_match(text, entry):
     """Args for an approved instinct ([] for no-arg), or None. Fires only on a short, plain request
     whose words equal an approved phrasing's, or follow an approved template word for word."""
@@ -280,7 +299,7 @@ def instinct_match(text, entry):
     t = toks(text)
     if not t or t & NEGATIONS:
         return None
-    if any(t == toks(p) for p in entry.get("approved_phrasings", [])):
+    if any(seq(text) == seq(p) for p in entry.get("approved_phrasings", [])):
         return []
     for tpl in entry.get("approved_templates", []):
         args = template_args(text, tpl)
@@ -401,7 +420,7 @@ def bump(scope, key, field, with_args=None, quiet=False, args=None):
             e["fails"] = 0
             if with_args is False and is_script(e):
                 e["streak"] = e.get("streak", 0) + 1
-                if pending and not any(toks(pending) == toks(p) for p in e.get("phrasings", [])):
+                if pending and not any(seq(pending) == seq(p) for p in e.get("phrasings", [])):
                     e["phrasings"] = (e.get("phrasings", []) + [pending])[-MAX_PHRASINGS:]
             elif with_args and is_script(e):
                 tpl = make_template(pending, args)  # the args were words of the prompt: learn the pattern
@@ -463,7 +482,7 @@ def cmd_promote(project, key, only_global):
         body = f.read()
     h = file_hash(path)
     print(f"Instinct review: '{k}' ({label(scope)})\n"
-          f"It will run with NO model call when your whole prompt is one of these (ignoring filler words):")
+          f"It will run with NO model call when your whole prompt is one of these (same words in the same order, ignoring filler words like 'the'):")
     for p in e.get("phrasings", []):
         print(f"  - {p}")
     if e.get("templates"):
@@ -597,7 +616,7 @@ def launch(project, cwd, prompt):
     if not is_script(e) or not os.path.exists(reflex_path(scope, e)):
         return False
     rc, output = run_instinct(reflex_path(scope, e), project if scope != GLOBAL else cwd, args)
-    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), quiet=True)
+    bump(scope, k, "uses" if rc == 0 else "fails", quiet=True)  # with_args=None: never counts toward instinct
     if len(output) > 4000:
         output = "...\n" + output[-4000:]
     status = "ran" if rc == 0 else f"failed (exit {rc}) running"

@@ -222,6 +222,11 @@ class Instinct(Base):
         self.assertEqual(out["decision"], "block")
         self.assertTrue(out["reason"].rstrip().endswith("ran in " + self.a), out["reason"])
 
+    def test_reordered_phrasing_does_not_fire(self):
+        self.make_instinct()
+        self.assertNotIn('"decision": "block"', self.hook("worker the deploy"))
+        self.assertIn('"decision": "block"', self.hook("Deploy the worker."))
+
     def test_instinct_never_fires_on_negation_question_or_other_wording(self):
         self.make_instinct()
         for prompt in ("do not deploy the cloudflare worker", "rollback the cloudflare worker deploy",
@@ -347,6 +352,14 @@ class Launcher(Base):
         self.make_reflex(body="echo boom; exit 3")
         self.assertIn("failed (exit 3)", json.loads(self.hook("mm deploy-worker"))["reason"])
 
+    def test_launcher_runs_never_count_toward_instinct(self):
+        self.make_reflex()
+        for _ in range(3):
+            self.hook("deploy the worker")         # leaves a pending prompt
+            self.hook("mm deploy-worker")          # explicit launch must not turn it into a phrasing
+        self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("instinct-in=2", self.mm("list"))
+
     def test_unknown_key_or_plain_prompt_falls_through(self):
         self.make_reflex()
         self.assertEqual(self.hook("mm what do you think").strip(), "")
@@ -449,6 +462,16 @@ class Robustness(Base):
             out = self.mm("list")
             self.assertIn("unreadable", out)
             self.assertNotIn("Traceback", out)
+
+    def test_wrong_field_types_are_tolerated(self):
+        self.make_reflex()
+        idx, d = self.index()
+        idx["deploy-worker"].update(triggers="deploy", summary=None, count="x", phrasings=[1, "a"])
+        with open(os.path.join(d, "index.json"), "w") as f:
+            json.dump(idx, f)
+        for args in (("list",), ("match", "deploy the worker"), ("show", "deploy-worker")):
+            self.assertNotIn("Traceback", self.mm(*args), args)
+        self.assertNotIn("Traceback", self.hook("deploy the worker"))
 
     def test_entry_missing_fields_is_tolerated(self):
         self.mm("log", "a-task", "a")
