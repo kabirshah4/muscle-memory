@@ -90,6 +90,7 @@ class Base(unittest.TestCase):
 
     def use_via_claude(self, prompt="deploy the worker", times=3, key="deploy-worker", cwd=None):
         """Simulate Claude: the prompt hook hints, then Claude runs the reflex with no args."""
+        self.mm("verify", key, cwd=cwd)  # the agent confirmed the output once
         for _ in range(times):
             self.hook(prompt, cwd)
             self.mm("run", key, cwd=cwd)
@@ -186,6 +187,34 @@ class Instinct(Base):
         self.assertIn("ELIGIBLE", self.mm("run", "deploy-worker"))
         self.assertNotIn("INSTINCT", self.mm("list"))
         self.assertIn("promote deploy-worker", self.hook("deploy the worker"))
+
+    def test_unverified_output_never_becomes_eligible(self):
+        self.make_reflex()
+        self.assertIn("hasn't been checked yet", self.hook("deploy the worker"))
+        for _ in range(3):
+            self.hook("deploy the worker")
+            self.mm("run", "deploy-worker")
+        self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("output-unchecked", self.mm("list"))
+        self.assertIn("ELIGIBLE", self.mm("verify", "deploy-worker"))
+        self.assertNotIn("hasn't been checked yet", self.hook("deploy the worker"))
+
+    def test_resaving_script_requires_new_check(self):
+        script = self.make_reflex()
+        self.mm("verify", "deploy-worker")
+        self.mm("save", "deploy-worker", script)
+        self.assertIn("output-unchecked", self.mm("list"))
+
+    def test_promote_shows_last_output(self):
+        out = self.make_instinct()
+        self.assertIn("Its last output", out)
+        self.assertIn("ran in " + self.a, out)
+
+    def test_hit_rate_counts_free_runs_and_near_misses(self):
+        self.make_instinct()
+        self.hook("deploy the worker")
+        self.hook("deploy the worker to the cloudflare edge right now")  # matches the task, not a wording
+        self.assertIn("free-runs=1 near-misses=1 (hit rate 50%)", self.mm("list"))
 
     def test_runs_without_a_prompt_never_become_eligible(self):
         self.make_reflex()
@@ -310,6 +339,7 @@ class Hints(Base):
 class Templates(Base):
     def learn(self):
         self.make_reflex(body='echo "deployed to $1"')
+        self.mm("verify", "deploy-worker")
         for env in ("staging", "prod"):
             self.hook(f"deploy the worker to {env}")
             self.mm("run", "deploy-worker", env)

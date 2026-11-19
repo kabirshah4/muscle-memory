@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Output check: a script must have its output confirmed correct once (`mm verify`) before it can become an instinct
+- Hit rate: `mm list` shows free runs vs near-misses for each instinct
+- Codex: failed or denied tool calls no longer count
+- Instinct details moved to docs/how-it-works.md
 - Failed or denied tool calls no longer count toward learning a task
 - Security policy, code of conduct, PR template, sources in the README
 

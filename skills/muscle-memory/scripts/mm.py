@@ -76,7 +76,7 @@ VERB_ARGS = {  # command -> (minimum positional args, usage)
     "log": (1, 'log [--global] <key> "<summary>" [--triggers a,b]'),
     "save": (2, "save [--global] <key> <file> [--summary \"what it does, in general terms\"]"),
     "run": (1, "run [--global] <key> [args...]"),
-    "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
+    "verify": (1, "verify [--global] <key>"), "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
     "promote": (1, "promote [--global] <key>"), "demote": (1, "demote [--global] <key>"),
     "show": (1, "show [--global] <key>"), "forget": (1, "forget [--global] <key>"),
     "install": (0, "install --cli codex|gemini|cursor"), "uninstall": (0, "uninstall --cli codex|gemini|cursor"),
@@ -404,11 +404,32 @@ def cmd_save(scope, key, src, summary=None):
             if old != key + ext and old.split(".")[0] == key:
                 os.remove(os.path.join(rdir, old))
         e = idx.setdefault(key, new_entry())
-        e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False,
+        e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False, verified=False,
                  approved_sha=None, approved_phrasings=[], compile_asked=False)
         if summary:
             e["summary"] = summary.strip()[:200]
     print(f"saved reflex {dest}")
+
+
+def mark_eligible(e):
+    """Eligible = enough clean runs, an approvable wording, AND the agent confirmed once that the output
+    matched the request (exit 0 alone can't tell a wrong report from a right one)."""
+    if (e.get("streak", 0) >= INSTINCT_AFTER and (e.get("phrasings") or e.get("templates"))
+            and e.get("verified") and not e.get("instinct") and not e.get("eligible")):
+        e["eligible"] = True
+        return True
+    return False
+
+
+def cmd_verify(project, key, only_global):
+    scope, k, e = resolve(project, key, only_global)
+    if not e.get("reflex"):
+        raise StoreError(f"'{k}' has no reflex to verify")
+    with edit(scope) as idx:
+        idx[k]["verified"] = True
+        now = mark_eligible(idx[k])
+    print(f"{k}: output confirmed correct" + (". It is now ELIGIBLE to become an instinct; tell the user they "
+          f"can approve it in their own terminal with: python3 {SELF} promote {k}" if now else ""))
 
 
 def bump(scope, key, field, with_args=None, quiet=False, args=None):
@@ -433,13 +454,11 @@ def bump(scope, key, field, with_args=None, quiet=False, args=None):
                         e["templates"] = (e.get("templates", []) + [tpl])[-MAX_PHRASINGS:]
                 else:
                     e["streak"] = 0
-            if (e.get("streak", 0) >= INSTINCT_AFTER and (e.get("phrasings") or e.get("templates"))
-                    and not e.get("instinct") and not e.get("eligible")):
-                e["eligible"] = True
+            if mark_eligible(e):
                 out(f"{key} is now ELIGIBLE to become an instinct. It is NOT promoted. Tell the user they can "
                     f"review and approve it in their own terminal with: python3 {SELF} promote {key}")
         else:
-            e["streak"], e["instinct"], e["eligible"] = 0, False, False
+            e["streak"], e["instinct"], e["eligible"], e["verified"] = 0, False, False, False
             if e["fails"] >= 2 and e.get("reflex"):
                 out(f"{key} failed twice in a row - reflex disabled, fix and re-save it")
                 p = reflex_path(scope, e)
@@ -463,7 +482,14 @@ def cmd_run(project, key, args, only_global):
         print(f"(recipe reflex: follow it, then run `python3 {SELF} hit {k}` or `fail {k}`)")
         return 0
     cwd = scope if scope != GLOBAL else os.getcwd()  # same directory an instinct would run in
-    rc = subprocess.call(["python3" if path.endswith(".py") else "bash", path] + args, cwd=cwd)
+    r = subprocess.run(["python3" if path.endswith(".py") else "bash", path] + args, cwd=cwd,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    rc, out = r.returncode, r.stdout or ""
+    sys.stdout.write(out)
+    sys.stdout.flush()
+    if rc == 0:
+        with edit(scope) as idx:  # shown at `promote`, so the user approves what it produces, not just the code
+            idx[k]["last_output"] = {"args": args, "text": out[-1500:]}
     bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), args=args)
     return rc
 
@@ -495,7 +521,10 @@ def cmd_promote(project, key, only_global):
             print(f"  - {t}")
     print(f"Working directory: {'wherever Claude is running' if scope == GLOBAL else scope}\n"
           f"Script {path} (sha256 {h[:12]}):\n{'-' * 60}\n{body.rstrip()}\n{'-' * 60}\n"
-          f"Approval covers this file only. Anything it calls (other scripts, npm/make targets) is not pinned.")
+          + (f"Its last output{' (args: ' + ' '.join(e['last_output'].get('args') or []) + ')' if (e.get('last_output') or {}).get('args') else ''}:\n"
+             f"{(e.get('last_output') or {}).get('text', '').rstrip() or '(none recorded)'}\n{'-' * 60}\n"
+             if isinstance(e.get("last_output"), dict) else "")
+          + f"Approval covers this file only. Anything it calls (other scripts, npm/make targets) is not pinned.")
     answer = input("Approve this instinct? Type 'yes' to approve: ").strip().lower()
     if answer != "yes":
         print("not approved")
@@ -532,13 +561,16 @@ def cmd_list(project, all_projects):
                 quiet += 1  # seen once, logged silently: not worth a line until it repeats
                 continue
             if e.get("instinct"):
-                status = (f"INSTINCT {e['reflex']} uses={e.get('uses', 0)}" if approval_valid(scope, e)
+                h, nm = e.get("instinct_hits", 0), e.get("near_misses", 0)
+                status = (f"INSTINCT {e['reflex']} free-runs={h} near-misses={nm}"
+                          + (f" (hit rate {h * 100 // (h + nm)}%)" if h + nm else "") if approval_valid(scope, e)
                           else f"reflex {e.get('reflex')} - script changed since approval, needs re-approval")
             elif e.get("eligible"):
                 status = f"reflex {e['reflex']} uses={e.get('uses', 0)} ELIGIBLE (approve: promote {k})"
             elif e.get("reflex") and is_script(e):
                 status = (f"reflex {e['reflex']} uses={e.get('uses', 0)} "
-                          f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}")
+                          f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}"
+                          + ("" if e.get("verified") else " output-unchecked"))
             elif e.get("reflex"):
                 status = f"recipe {e['reflex']} uses={e.get('uses', 0)}"
             else:
@@ -725,6 +757,8 @@ def prompt_hook(data):
             output = "...\n" + output[-4000:]
         if rc == 0:
             bump(scope, k, "uses", quiet=True)
+            with edit(scope) as idx:
+                idx[k]["instinct_hits"] = idx[k].get("instinct_hits", 0) + 1
             emit_block(done_message(k, time.time() - t0, output))
             return
         bump(scope, k, "fails", quiet=True)
@@ -733,11 +767,16 @@ def prompt_hook(data):
         return
     with edit(scope) as idx:  # remember the wording; a clean `run` turns it into an approvable phrasing
         idx[k]["pending_prompt"] = prompt.strip()[:300]
+        if e.get("instinct"):  # matched the task but not an approved wording: went to the model
+            idx[k]["near_misses"] = idx[k].get("near_misses", 0) + 1
     hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match. If that is the task, run "
             f"`python3 {SELF} run {k} [args]` as your first step"
             + (" (it's a script: different names or values just become its args)" if is_script(e) else "")
-            + "; answer briefly from its output; don't "
-            f"explore or re-check what it already did. If it fails, do the task normally.")
+            + "; answer briefly from its output. If it fails, do the task normally."
+            + (f" This script's output hasn't been checked yet: once, compare what it produced with exactly "
+               f"what the user asked (exit 0 isn't enough). If it matches, run `python3 {SELF} verify {k}`; "
+               f"if not, run `python3 {SELF} fail {k}`, do the task properly and re-save a fixed script."
+               if is_script(e) and not e.get("verified") else " Don't explore or re-check what it already did."))
     note = None
     if e.get("eligible"):  # shown to the user only: costs no model tokens
         note = (f"[muscle-memory] '{k}' can run with zero tokens. To approve it, run in your "
@@ -768,7 +807,7 @@ def block(reason):
     emit_stop(reason)
 
 
-MM_CALL = re.compile(r"(mm\.py|\$\{?MM\}?)\W.*\b(log|hit|fail|save|run)\b")
+MM_CALL = re.compile(r"(mm\.py|\$\{?MM\}?)\W.*\b(log|hit|fail|save|run|verify)\b")
 
 
 def stop_hook(data):
@@ -971,6 +1010,8 @@ def main(argv):
             cmd_save(scope, rest[0], rest[1], summary)
         elif c == "run":
             return cmd_run(project, rest[0], rest[1:], only_global)
+        elif c == "verify":
+            cmd_verify(project, rest[0], only_global)
         elif c in ("hit", "fail"):
             s, k, _ = resolve(project, rest[0], only_global)
             bump(s, k, "uses" if c == "hit" else "fails")
