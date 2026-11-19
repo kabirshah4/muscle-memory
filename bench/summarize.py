@@ -31,7 +31,9 @@ def summary(rows):
         res[task] = {}
         for ph, rs in phases.items():
             ran = [r for r in rs if r["ok"] != ""]
+            costs = [float(r["cost_usd"]) for r in ran if r.get("cost_usd") not in ("", None)]
             res[task][ph] = dict(
+                lo=min(costs) if costs else None, hi=max(costs) if costs else None,
                 cost=med(ran, "cost_usd"), calls=med(ran, "tool_calls"), secs=med(ran, "duration_s"),
                 ok=f"{sum(r['ok'] == 'True' for r in ran)}/{len(ran)}", n=len(ran),
                 used=f"{sum(r.get('used_reflex') == 'True' for r in ran)}/{len(ran)}",
@@ -56,14 +58,17 @@ def markdown(res):
                 cells.append("n/a" if p == "instinct" else "—")
             else:
                 used = f" · used {s['used']}" if p in ("reflex", "instinct") else ""
-                cells.append(f"{fmt(s['cost'], 'cost')} · {fmt(s['secs'], 'secs')} · ✓{s['ok']}{used}")
+                spread = (f" ({fmt(s['lo'], 'cost')}–{fmt(s['hi'], 'cost')}, n={s['n']})"
+                          if s["n"] > 1 and s["lo"] != s["hi"] else f" (n={s['n']})")
+                cells.append(f"{fmt(s['cost'], 'cost')}{spread} · {fmt(s['secs'], 'secs')} · ✓{s['ok']}{used}")
         r, c = ph.get("reflex", {}).get("cost"), ph.get("control", {}).get("cost")
         delta = f"{(1 - r / c) * 100:+.0f}% cheaper" if r is not None and c else "—"
         if r is not None and c and r > c:
             delta = f"{(r / c - 1) * 100:.0f}% dearer"
         lines.append(f"| {task} | " + " | ".join(cells) + f" | {delta} |")
     lines.append("")
-    lines.append("Cells: median cost · median time · runs with correct output · runs where a reflex or instinct "
+    lines.append("With 1-3 runs per cell, differences under ~30% are within run-to-run noise.")
+    lines.append("Cells: median cost (min–max, number of runs) · median time · runs with correct output · runs where a reflex or instinct "
                  "was actually used. Control = same prompt as reflex runs, plugin off.")
     return "\n".join(lines)
 

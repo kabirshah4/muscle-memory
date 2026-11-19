@@ -414,27 +414,50 @@ def cmd_save(scope, key, src, summary=None):
 # ---------- output check: compare a script's result with what was done by hand ----------
 
 TOKEN = re.compile(r"[a-z0-9][a-z0-9_./-]{2,}")
-JUNK = re.compile(r"(^|/)(__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|node_modules|\.next|dist|build|"
-                  r"coverage|\.tox|\.venv|\.cache)(/|$)|\.(pyc|pyo|log|tmp)$|(^|/)\.DS_Store$")
-
+JUNK = re.compile(r"(^|/)(__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|\.tox|\.cache)(/|$)"
+                  r"|\.(pyc|pyo)$|(^|/)\.DS_Store$")  # caches only: build/ and dist/ can be the real output
+MAX_PATHS = 2000          # bigger changes than this aren't checked (too slow, and not a routine task)
+MAX_TEXT = 2_000_000      # bytes of added content read per check
 
 def git_out(root, *args):
     try:
-        r = subprocess.run(["git", "-C", root, *args], capture_output=True, text=True, timeout=20)
-        return r.stdout if r.returncode == 0 else None
+        r = subprocess.run(["git", "-C", root, *args], capture_output=True, timeout=30)
+        return r.stdout.decode("utf-8", "replace") if r.returncode == 0 else None
     except (OSError, subprocess.SubprocessError):
         return None
 
 
+def z_paths(out):
+    """NUL-separated `git ... -z` path list (safe for spaces, newlines, quotes and non-ASCII names)."""
+    return [p for p in (out or "").split("\0") if p]
+
+
+def status_z(root):
+    """{path: code} from `git status --porcelain=v1 -z -uall`; renames are reported under the new path."""
+    out, res, parts = git_out(root, "status", "--porcelain=v1", "-z", "-uall"), {}, None
+    parts = (out or "").split("\0")
+    i = 0
+    while i < len(parts):
+        entry = parts[i]
+        if len(entry) > 3:
+            code, path = entry[:2], entry[3:]
+            res[path] = code
+            if "R" in code or "C" in code:
+                i += 1  # the next field is the original path
+        i += 1
+    return res
+
+
 def snapshot(root):
-    """Repo state before a turn or a run: HEAD, tags, untracked files and already-modified files."""
+    """Repo state before a turn or a run: HEAD, tags, and files that were already changed."""
     head = (git_out(root, "rev-parse", "HEAD") or "").strip()
     if not head:
         return None
-    status = git_out(root, "status", "--porcelain", "-uall") or ""
+    status = status_z(root)
+    if len(status) > MAX_PATHS:
+        return None
     dirty = {}
-    for line in status.splitlines():
-        path = line[3:]
+    for path in status:
         try:
             dirty[path] = file_hash(os.path.join(root, path))
         except OSError:
@@ -443,33 +466,45 @@ def snapshot(root):
 
 
 def fingerprint(root, snap):
-    """What changed since the snapshot: paths, new tags, and the words in the added content."""
+    """What changed since the snapshot: paths written, paths deleted, new tags, words in the added content."""
     if not snap or not snap.get("head"):
         return None
     head0 = snap["head"]
-    paths = set((git_out(root, "diff", "--name-only", head0) or "").split("\n")) - {""}
-    status = git_out(root, "status", "--porcelain", "-uall") or ""
-    new_files = [l[3:] for l in status.splitlines() if l.startswith("??")]
-    paths |= set(new_files)
-    text = "\n".join(l[1:] for l in (git_out(root, "diff", "-U0", head0) or "").splitlines()
-                     if l.startswith("+") and not l.startswith("+++"))
-    for f in new_files:
+    changed = set(z_paths(git_out(root, "diff", "--name-only", "-z", head0)))
+    status = status_z(root)
+    new_files = [p for p, c in status.items() if c == "??"]
+    changed |= set(new_files)
+    if len(changed) > MAX_PATHS:
+        return None
+    deleted = set(z_paths(git_out(root, "diff", "--name-only", "-z", "--diff-filter=D", head0)))
+    for path, h in (snap.get("dirty") or {}).items():  # already changed before and untouched since
         try:
-            with open(os.path.join(root, f), errors="replace") as fh:
-                text += "\n" + fh.read(200_000)
+            if path in changed and h == file_hash(os.path.join(root, path)):
+                changed.discard(path)
         except OSError:
             pass
-    for path, h in (snap.get("dirty") or {}).items():  # already changed before the turn and untouched since
+    budget = MAX_TEXT
+    diff = git_out(root, "diff", "-U0", "--no-color", "--no-ext-diff", head0) or ""
+    text = "\n".join(l[1:] for l in diff[:budget].splitlines() if l.startswith("+") and not l.startswith("+++"))
+    budget -= len(text)
+    for f in new_files:
+        if budget <= 0:
+            break
         try:
-            if path in paths and h == file_hash(os.path.join(root, path)):
-                paths.discard(path)
+            with open(os.path.join(root, f), "rb") as fh:
+                raw = fh.read(min(200_000, budget))
+            if b"\0" in raw[:4096]:
+                continue  # binary
+            text += "\n" + raw.decode("utf-8", "replace")
+            budget -= len(raw)
         except OSError:
             pass
     text += "\n" + (git_out(root, "log", "--format=%s%n%b", f"{head0}..HEAD") or "")
     tags = sorted(set((git_out(root, "tag") or "").split()) - set(snap.get("tags") or []))
     text += "\n" + " ".join(tags)
-    paths = {p for p in paths if not JUNK.search(p)}  # caches and build output aren't the task's result
-    return {"paths": sorted(paths)[:200], "tags": len(tags), "tokens": sorted(set(TOKEN.findall(text.lower())))[:3000]}
+    changed = {p for p in changed if not JUNK.search(p)}  # caches aren't the task's result
+    return {"paths": sorted(changed - deleted)[:MAX_PATHS], "deleted": sorted(deleted)[:MAX_PATHS],
+            "tags": len(tags), "tag_names": tags, "tokens": sorted(set(TOKEN.findall(text.lower())))[:5000]}
 
 
 COMMON = set("""
@@ -505,22 +540,36 @@ def checkable(e):
 
 
 def compare(fps, fp):
-    """(ok, reason). Every file and every word that ALL by-hand runs produced must be in the script's result."""
+    """(ok, reason). The script's result must contain everything that ALL by-hand runs produced (files,
+    tags, and the salient words), roughly as much content, and no deletions the by-hand runs didn't make."""
     if fp is None:
-        return False, "couldn't read the repo state after the run"
+        return False, "couldn't read the repo state after the run (not a git repo, or too many changes)"
     need_paths = set.intersection(*(set(f.get("paths", [])) for f in fps))
     need_words = set.intersection(*(salient(f.get("tokens", [])) for f in fps))
     need_tags = min(f.get("tags", 0) for f in fps)
-    missing_paths = sorted(need_paths - set(fp["paths"]))
-    missing_words = sorted(need_words - salient(fp["tokens"]))
+    same_tags = set.intersection(*(set(f.get("tag_names", [])) for f in fps)) if need_tags else set()
+    allowed_deletes = set.union(*(set(f.get("deleted", [])) for f in fps))
+    got_words = salient(fp["tokens"])
     problems = []
+    missing_paths = sorted(need_paths - set(fp["paths"]))
     if missing_paths:
         problems.append("didn't change " + ", ".join(missing_paths[:8]))
-    if fp["tags"] < need_tags:
+    extra_deletes = sorted(set(fp.get("deleted", [])) - allowed_deletes)
+    if extra_deletes:
+        problems.append("deleted " + ", ".join(extra_deletes[:8]) + ", which the by-hand runs never did")
+    if fp["tags"] != need_tags and not (need_tags and fp["tags"] >= need_tags):
         problems.append(f"created {fp['tags']} git tag(s), the by-hand runs created {need_tags}")
+    missing_tags = sorted(same_tags - set(fp.get("tag_names", [])))
+    if missing_tags:
+        problems.append("didn't create tag " + ", ".join(missing_tags))
+    missing_words = sorted(need_words - got_words)
     if missing_words:
         problems.append("its output is missing " + ", ".join(repr(w) for w in missing_words[:12])
                         + (f" and {len(missing_words) - 12} more" if len(missing_words) > 12 else ""))
+    least = min(len(salient(f.get("tokens", []))) for f in fps)
+    if least >= 20 and len(got_words) < least // 2:
+        problems.append(f"it produced much less content than by hand ({len(got_words)} distinct terms vs "
+                        f"at least {least})")
     return (not problems), "; ".join(problems)
 
 
@@ -906,9 +955,20 @@ def prompt_hook(data):
             idx[k].update(instinct=False, eligible=bool(idx[k].get("phrasings") or idx[k].get("templates")))
     elif e.get("instinct") and instinct_match(prompt, e) is not None:
         t0 = time.time()
+        fps = checkable(e)
+        snap = snapshot(project) if fps else None
         rc, output = run_instinct(path, project if scope != GLOBAL else cwd, instinct_match(prompt, e))
         if len(output) > 4000:
             output = "...\n" + output[-4000:]
+        if rc == 0 and fps and snap:  # the repo may have changed since approval: check every free run too
+            ok, why = compare(fps, fingerprint(project, snap))
+            if not ok:
+                bump(scope, k, "fails", quiet=True)
+                emit_context(f"[muscle-memory] The instinct '{k}' ran, but its result no longer matches what was "
+                             f"done by hand ({why}), so it was demoted. Its output:\n{output}\nCheck what it "
+                             f"changed, finish the user's request properly, then fix and re-save the script with "
+                             f"`python3 {SELF} save {k} <file>`.")
+                return
         if rc == 0:
             bump(scope, k, "uses", quiet=True)
             with edit(scope) as idx:
