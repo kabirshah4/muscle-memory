@@ -20,8 +20,8 @@ and your proven reflexes into instincts that run with **zero tokens**.
 <br>
 
 <p align="center">
-  <img alt="A real Claude Code session: typing 'update the health report' is answered by the hook, which runs the approved script with no model call and shows its output. Typing 'mm health-report' does the same." src="docs/demo.gif" width="100%">
-  <br><sub>A real Claude Code session (Opus). Both prompts were answered by the hook: no model call, 0 tokens.</sub>
+  <img alt="A real Claude Code session. 'update the health report' and 'add a payments module with a test' are each answered in 0.1 seconds by muscle-memory with no model call: the report is updated, and the module and its passing test are created." src="docs/demo.gif" width="100%">
+  <br><sub>A real Claude Code session on Opus. Both requests were learned earlier and are now done instantly, for 0 tokens. The second one takes an input (<code>payments</code>).</sub>
 </p>
 
 <picture>
@@ -55,6 +55,24 @@ Requires Claude Code, `python3` 3.10+ (standard library only) and `bash`, on **m
 > Install it as a **plugin**, not by copying the skill folder. The hooks do the work: without them, Claude rarely loads the skill on its own.
 
 Then just work normally. There's nothing to configure.
+
+### Other agent CLIs
+
+The engine is one Python script, so the same reflexes work across tools and are shared between them. For CLIs other than Claude Code, install the skill and hooks with one command (it keeps your existing hooks, backs up the config file first, and `uninstall` removes only its own entries):
+
+```bash
+python3 skills/muscle-memory/scripts/mm.py install --cli codex     # or gemini, cursor
+```
+
+| CLI | Zero-token instincts and `mm <key>` | Reflex hints | Learns new tasks automatically | Verified |
+|---|:---:|:---:|:---:|---|
+| **Claude Code** | ✅ | ✅ | ✅ | live sessions + benchmark |
+| **Codex CLI** | ✅ | ✅ | ✅ | protocol tests; same hook format as Claude Code. Codex asks you to trust the hooks once |
+| **Gemini CLI** | ✅ | ✅ | via the skill | protocol tests only |
+| **Cursor CLI** | ✅ | ❌ (no context injection) | via the skill | protocol tests only |
+| **Copilot CLI, OpenCode** | ❌ (their hooks can't stop a prompt) | ❌ | via the skill | copy `skills/muscle-memory` into their skills folder |
+
+"Protocol tests" means the hook input and output follow each CLI's documented format and are covered by the test suite, but haven't been run in a live session of that CLI yet. Reports welcome.
 
 ## How it works
 
@@ -143,6 +161,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
 | `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
+| `MUSCLE_MEMORY_COLOR` | `1` | set to `0` for a plain (uncolored) "Done!" line |
 
 </details>
 
@@ -169,7 +188,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 50 end-to-end tests
+python3 -m unittest discover -v tests   # 57 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

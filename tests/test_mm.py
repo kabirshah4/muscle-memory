@@ -220,7 +220,8 @@ class Instinct(Base):
         os.makedirs(sub)
         out = json.loads(self.hook("deploy the worker please", sub))
         self.assertEqual(out["decision"], "block")
-        self.assertTrue(out["reason"].rstrip().endswith("ran in " + self.a), out["reason"])
+        self.assertIn("ran in " + self.a + "\n", out["reason"])
+        self.assertIn("no model call (0 tokens)", out["reason"])
 
     def test_reordered_phrasing_does_not_fire(self):
         self.make_instinct()
@@ -350,7 +351,7 @@ class Launcher(Base):
 
     def test_failure_is_reported_and_recorded(self):
         self.make_reflex(body="echo boom; exit 3")
-        self.assertIn("failed (exit 3)", json.loads(self.hook("mm deploy-worker"))["reason"])
+        self.assertIn("failed with exit 3", json.loads(self.hook("mm deploy-worker"))["reason"])
 
     def test_launcher_runs_never_count_toward_instinct(self):
         self.make_reflex()
@@ -364,6 +365,75 @@ class Launcher(Base):
         self.make_reflex()
         self.assertEqual(self.hook("mm what do you think").strip(), "")
         self.assertNotIn("block", self.hook("mm deploy-worker'unclosed"))  # bad quoting: not launched
+
+
+class OtherCLIs(Base):
+    def cli_hook(self, cli, payload):
+        return self.mm("hook", "--cli", cli, stdin=json.dumps(payload))
+
+    def test_codex_uses_the_claude_protocol(self):
+        self.make_instinct()
+        out = json.loads(self.cli_hook("codex", {"prompt": "deploy the worker", "cwd": self.a}))
+        self.assertEqual(out["decision"], "block")
+
+    def test_gemini_denies_and_injects_context(self):
+        self.make_instinct()
+        out = json.loads(self.cli_hook("gemini", {"prompt": "deploy the worker", "cwd": self.a}))
+        self.assertEqual(out["decision"], "deny")
+        hint = json.loads(self.cli_hook("gemini", {"prompt": "deploy the worker to the cloudflare edge now", "cwd": self.a}))
+        self.assertEqual(hint["hookSpecificOutput"]["hookEventName"], "BeforeAgent")
+
+    def test_cursor_stops_with_user_message_and_uses_workspace_root(self):
+        self.make_instinct()
+        out = json.loads(self.cli_hook("cursor", {"prompt": "deploy the worker", "workspace_roots": [self.a]}))
+        self.assertEqual(out["continue"], False)
+        self.assertIn("ran in " + self.a, out["user_message"])
+
+    def test_codex_transcript_is_learned(self):
+        p = os.path.join(self.root, "rollout.jsonl")
+        msg = lambda text: {"type": "response_item", "payload": {"type": "message", "role": "user",
+                                                                 "content": [{"type": "input_text", "text": text}]}}
+        call = {"type": "response_item", "payload": {"type": "function_call", "name": "exec", "arguments": "{}"}}
+        with open(p, "w") as f:
+            for m in [msg("<environment_context>x</environment_context>"), msg("set up the database fixtures"),
+                      call, call, call]:
+                f.write(json.dumps(m) + "\n")
+        self.mm("stop-hook", "--cli", "codex", stdin=json.dumps({"transcript_path": p, "cwd": self.a}))
+        self.mm("stop-hook", "--cli", "codex", stdin=json.dumps({"transcript_path": p, "cwd": self.a}))
+        self.assertIn("database-fixtures", self.mm("list"))
+
+    def test_install_merges_hooks_and_uninstall_restores(self):
+        home = os.path.join(self.root, "home")
+        os.makedirs(os.path.join(home, ".codex"))
+        other = {"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "other-tool"}]}]}}
+        with open(os.path.join(home, ".codex", "hooks.json"), "w") as f:
+            json.dump(other, f)
+        env = {"HOME": home}
+        for _ in range(2):  # idempotent
+            self.mm("install", "--cli", "codex", env=env)
+        with open(os.path.join(home, ".codex", "hooks.json")) as f:
+            cfg = json.load(f)
+        cmds = [h["command"] for e in cfg["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
+        self.assertEqual(len(cmds), 2)
+        self.assertIn("other-tool", cmds)
+        self.assertIn("hook --cli codex", cmds[1])
+        self.assertTrue(os.path.isfile(os.path.join(home, ".agents", "skills", "muscle-memory", "SKILL.md")))
+        self.mm("uninstall", "--cli", "codex", env=env)
+        with open(os.path.join(home, ".codex", "hooks.json")) as f:
+            self.assertEqual(json.load(f), other)
+        self.assertFalse(os.path.exists(os.path.join(home, ".agents", "skills", "muscle-memory")))
+
+    def test_install_refuses_invalid_config(self):
+        home = os.path.join(self.root, "home")
+        os.makedirs(os.path.join(home, ".cursor"))
+        with open(os.path.join(home, ".cursor", "hooks.json"), "w") as f:
+            f.write("{not json")
+        self.assertIn("nothing was changed", self.mm("install", "--cli", "cursor", env={"HOME": home}))
+        self.assertNotEqual(self.rc("install", "--cli", "nope"), 0)
+
+    def test_missing_transcript_is_ignored(self):
+        out = self.mm("stop-hook", "--cli", "gemini", stdin=json.dumps({"cwd": self.a}))
+        self.assertEqual(out.strip(), "")
 
 
 class StopHook(Base):

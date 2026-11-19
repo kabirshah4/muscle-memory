@@ -18,7 +18,8 @@ Commands:
   demote [--global] <key>                    turn an instinct off
   list [--all]                               tasks here + global (--all: every project)
   show | forget [--global] <key>             print / delete a reflex
-  hook | stop-hook                           Claude Code hook entry points (JSON on stdin)
+  install | uninstall --cli codex|gemini|cursor   add/remove the skill and hooks for another agent CLI
+  hook | stop-hook [--cli NAME]              hook entry points (JSON on stdin); NAME defaults to claude
 """
 import hashlib
 import json
@@ -78,7 +79,9 @@ VERB_ARGS = {  # command -> (minimum positional args, usage)
     "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
     "promote": (1, "promote [--global] <key>"), "demote": (1, "demote [--global] <key>"),
     "show": (1, "show [--global] <key>"), "forget": (1, "forget [--global] <key>"),
-    "list": (0, "list [--all]"), "hook": (0, "hook"), "stop-hook": (0, "stop-hook"),
+    "install": (0, "install --cli codex|gemini|cursor"), "uninstall": (0, "uninstall --cli codex|gemini|cursor"),
+    "list": (0, "list [--all]"), "hook": (0, "hook [--cli claude|codex|gemini|cursor]"),
+    "stop-hook": (0, "stop-hook [--cli claude|codex|gemini|cursor]"),
 }
 
 
@@ -560,9 +563,25 @@ def cmd_forget(project, key, only_global):
 
 # ---------- hooks (must never break Claude Code: every failure is silent) ----------
 
+def codex_turn(m, state):
+    """Fold one Codex rollout record into state = [prompt, calls]. Returns False if it isn't one."""
+    if m.get("type") != "response_item" or not isinstance(m.get("payload"), dict):
+        return False
+    p = m["payload"]
+    if p.get("type") == "message" and p.get("role") == "user":
+        text = " ".join(c.get("text", "") for c in p.get("content") or [] if isinstance(c, dict))
+        if text.strip() and not text.lstrip().startswith(("<", "# AGENTS.md")):  # skip injected context
+            state[0], state[1] = text, []
+    elif p.get("type") in ("function_call", "custom_tool_call", "local_shell_call"):
+        state[1].append({"type": "tool_use", "name": p.get("name"),
+                         "input": {"command": p.get("arguments") or p.get("input") or p.get("action")}})
+    return True
+
+
 def last_turn(transcript_path, tail_bytes=4_000_000):
-    """(prompt text, tool_use blocks) for the latest turn of a Claude Code transcript."""
+    """(prompt text, tool_use blocks) for the latest turn of a Claude Code or Codex transcript."""
     prompt, calls = "", []
+    codex = ["", []]
     with open(transcript_path, "rb") as f:
         f.seek(0, os.SEEK_END)
         f.seek(max(0, f.tell() - tail_bytes))
@@ -572,7 +591,7 @@ def last_turn(transcript_path, tail_bytes=4_000_000):
             m = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(m, dict):
+        if not isinstance(m, dict) or codex_turn(m, codex):
             continue
         content = (m.get("message") or {}).get("content")
         if m.get("type") == "user" and not m.get("isMeta"):
@@ -584,7 +603,7 @@ def last_turn(transcript_path, tail_bytes=4_000_000):
                 calls = []
         elif m.get("type") == "assistant" and isinstance(content, list):
             calls += [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
-    return prompt, calls
+    return (prompt, calls) if prompt or not codex[0] else (codex[0], codex[1])
 
 
 def run_instinct(path, cwd, args=()):
@@ -597,6 +616,52 @@ def run_instinct(path, cwd, args=()):
         os.killpg(p.pid, signal.SIGKILL)  # the whole process group, not just the shell
         p.communicate()
         return 124, f"timed out after {INSTINCT_TIMEOUT}s"
+
+
+# Each agent CLI speaks a slightly different hook protocol. Claude Code and Codex share one.
+CLI = "claude"
+CLIS = ("claude", "codex", "gemini", "cursor")
+PROMPT_EVENT = {"claude": "UserPromptSubmit", "codex": "UserPromptSubmit", "gemini": "BeforeAgent"}
+
+
+def emit_block(text):
+    """Answer the prompt ourselves: the model is never called."""
+    if CLI == "cursor":
+        print(json.dumps({"continue": False, "user_message": text}))
+    elif CLI == "gemini":
+        print(json.dumps({"decision": "deny", "reason": text}))
+    else:
+        print(json.dumps({"decision": "block", "reason": text}))
+
+
+def emit_context(text, user_msg=None):
+    """Add a line to the model's context (and optionally show the user a note that costs no tokens)."""
+    if CLI == "cursor":  # no context injection on beforeSubmitPrompt
+        print(json.dumps({"continue": True, **({"user_message": user_msg} if user_msg else {})}))
+        return
+    out = {"hookSpecificOutput": {"hookEventName": PROMPT_EVENT[CLI], "additionalContext": text}}
+    if user_msg:
+        out["systemMessage"] = user_msg
+    print(json.dumps(out))
+
+
+def emit_stop(reason):
+    """Ask the agent to do one more short step at the end of its turn."""
+    text = "[muscle-memory] " + reason
+    if CLI == "cursor":
+        print(json.dumps({"followup_message": text}))
+    elif CLI == "gemini":
+        print(json.dumps({"decision": "deny", "reason": text}))
+    else:
+        print(json.dumps({"decision": "block", "reason": text}))
+
+
+def done_message(k, secs, output):
+    head = f"✅ Done! in {secs:.1f}s by muscle-memory, with no model call (0 tokens)."
+    if CLI == "claude" and os.environ.get("MUSCLE_MEMORY_COLOR", "1") != "0":
+        head = f"\033[1;32m{head}\033[0m"
+    return (f"{head}\n\n{output}\n\n"
+            f"— '{k}' · say \"{BYPASS}\" to have the agent do it instead")
 
 
 LAUNCH = re.compile(r"^mm\s+([a-z0-9][a-z0-9-]*)(\s+.*)?$", re.S)
@@ -615,19 +680,21 @@ def launch(project, cwd, prompt):
         return False  # not a known reflex: an ordinary prompt that happens to start with "mm"
     if not is_script(e) or not os.path.exists(reflex_path(scope, e)):
         return False
+    t0 = time.time()
     rc, output = run_instinct(reflex_path(scope, e), project if scope != GLOBAL else cwd, args)
     bump(scope, k, "uses" if rc == 0 else "fails", quiet=True)  # with_args=None: never counts toward instinct
     if len(output) > 4000:
         output = "...\n" + output[-4000:]
-    status = "ran" if rc == 0 else f"failed (exit {rc}) running"
-    print(json.dumps({"decision": "block", "reason":
-        f"⚡ muscle-memory {status} '{k}' with no model call.\n\n{output}"}))
+    emit_block(done_message(k, time.time() - t0, output) if rc == 0 else
+               f"muscle-memory ran '{k}' (no model call), but it failed with exit {rc}:\n\n{output}")
     return True
 
 
 def prompt_hook(data):
-    prompt, cwd = data.get("prompt") or "", data.get("cwd") or os.getcwd()
-    if BYPASS in prompt.lower():
+    roots = data.get("workspace_roots") if isinstance(data.get("workspace_roots"), list) else []
+    prompt = data.get("prompt") or ""
+    cwd = data.get("cwd") or (roots[0] if roots else None) or os.environ.get("CURSOR_PROJECT_DIR") or os.getcwd()
+    if not isinstance(prompt, str) or BYPASS in prompt.lower():
         return
     project = project_root(cwd)
     if launch(project, cwd, prompt):
@@ -641,18 +708,17 @@ def prompt_hook(data):
         with edit(scope) as idx:  # script changed since approval (or approved before v0.5): re-approve
             idx[k].update(instinct=False, eligible=bool(idx[k].get("phrasings") or idx[k].get("templates")))
     elif e.get("instinct") and instinct_match(prompt, e) is not None:
+        t0 = time.time()
         rc, output = run_instinct(path, project if scope != GLOBAL else cwd, instinct_match(prompt, e))
         if len(output) > 4000:
             output = "...\n" + output[-4000:]
         if rc == 0:
             bump(scope, k, "uses", quiet=True)
-            print(json.dumps({"decision": "block", "reason":
-                f"⚡ muscle-memory ran the instinct '{k}' with no model call (0 tokens). "
-                f"Add \"{BYPASS}\" to have Claude do it instead.\n\n{output}"}))
+            emit_block(done_message(k, time.time() - t0, output))
             return
         bump(scope, k, "fails", quiet=True)
-        print(f"[muscle-memory] The instinct '{k}' just failed (exit {rc}) and was demoted. Output:\n{output}\n"
-              f"Do the task normally, then fix the reflex and re-save it with `python3 {SELF} save {k} <file>`.")
+        emit_context(f"[muscle-memory] The instinct '{k}' just failed (exit {rc}) and was demoted. Output:\n{output}\n"
+                     f"Do the task normally, then fix the reflex and re-save it with `python3 {SELF} save {k} <file>`.")
         return
     with edit(scope) as idx:  # remember the wording; a clean `run` turns it into an approvable phrasing
         idx[k]["pending_prompt"] = prompt.strip()[:300]
@@ -661,11 +727,11 @@ def prompt_hook(data):
             + (" (it's a script: different names or values just become its args)" if is_script(e) else "")
             + "; answer briefly from its output; don't "
             f"explore or re-check what it already did. If it fails, do the task normally.")
-    out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": hint}}
+    note = None
     if e.get("eligible"):  # shown to the user only: costs no model tokens
-        out["systemMessage"] = (f"[muscle-memory] '{k}' can run with zero tokens. To approve it, run in your "
-                                f"terminal: python3 {SELF} promote {k}")
-    print(json.dumps(out))
+        note = (f"[muscle-memory] '{k}' can run with zero tokens. To approve it, run in your "
+                f"terminal: python3 {SELF} promote {k}")
+    emit_context(hint, note)
 
 
 def auto_log(project, prompt):
@@ -688,23 +754,27 @@ def auto_log(project, prompt):
 
 
 def block(reason):
-    print(json.dumps({"decision": "block", "reason": "[muscle-memory] " + reason}))
+    emit_stop(reason)
 
 
 MM_CALL = re.compile(r"(mm\.py|\$\{?MM\}?)\W.*\b(log|hit|fail|save|run)\b")
 
 
 def stop_hook(data):
-    if data.get("stop_hook_active"):
+    if data.get("stop_hook_active") or data.get("loop_count"):
         return
-    prompt, calls = last_turn(data["transcript_path"])
+    tp = data.get("transcript_path") or data.get("transcriptPath")
+    if not tp or not os.path.isfile(tp):
+        return  # this CLI didn't give us a transcript we can read: learning falls back to the skill
+    prompt, calls = last_turn(tp)
     blobs = [json.dumps(c.get("input", {})) for c in calls]
     if any(MM_CALL.search(b) for b in blobs):
         return  # Claude logged, saved or used a reflex itself this turn
     work = [b for b in blobs if "mm.py" not in b and "$MM" not in b]
     if len(work) < MIN_CALLS:
         return
-    project = project_root(data.get("cwd"))
+    roots = data.get("workspace_roots") if isinstance(data.get("workspace_roots"), list) else []
+    project = project_root(data.get("cwd") or (roots[0] if roots else None) or os.environ.get("CURSOR_PROJECT_DIR"))
     m = find(project, prompt, need_reflex=False, min_overlap=COUNT_OVERLAP, min_shared=COUNT_SHARED)
     if m and m[2].get("reflex"):
         return  # a reflex existed and Claude chose not to use it; nothing to learn
@@ -746,6 +816,73 @@ def stop_hook(data):
           f"(Asked at most once per session.)")
 
 
+# ---------- install into other agent CLIs ----------
+
+INSTALL = {  # cli: (skills dir, hooks file, prompt event, stop event)
+    "codex": ("~/.agents/skills", "~/.codex/hooks.json", "UserPromptSubmit", "Stop"),
+    "gemini": ("~/.gemini/skills", "~/.gemini/settings.json", "BeforeAgent", "AfterAgent"),
+    "cursor": ("~/.cursor/skills", "~/.cursor/hooks.json", "beforeSubmitPrompt", "stop"),
+}
+
+
+def ours(entry):
+    return "muscle-memory" in json.dumps(entry) and "mm.py" in json.dumps(entry)
+
+
+def hook_entry(cli, cmd, timeout):
+    if cli == "cursor":
+        return {"command": cmd}
+    h = {"type": "command", "command": cmd}
+    if cli == "codex":
+        h["timeout"] = timeout
+    return {"matcher": "*", "hooks": [h]} if cli == "gemini" else {"hooks": [h]}
+
+
+def cmd_install(cli, remove=False):
+    if cli not in INSTALL:
+        raise StoreError(f"--cli must be one of: {', '.join(INSTALL)} (Claude Code installs it as a plugin)")
+    sdir, hfile, ev_prompt, ev_stop = INSTALL[cli]
+    src = os.path.dirname(os.path.dirname(SELF))  # skills/muscle-memory
+    dest = os.path.join(os.path.expanduser(sdir), "muscle-memory")
+    hfile = os.path.expanduser(hfile)
+    try:
+        with open(hfile) as f:
+            cfg = json.load(f)
+    except FileNotFoundError:
+        cfg = {}
+    except ValueError as err:
+        raise StoreError(f"{hfile} is not valid JSON ({err}); nothing was changed")
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("hooks", {}), dict):
+        raise StoreError(f"{hfile} has an unexpected shape; nothing was changed")
+    hooks = cfg.setdefault("hooks", {})
+    if cli == "cursor":
+        cfg.setdefault("version", 1)
+    for ev in (ev_prompt, ev_stop):  # drop our old entries, keep everyone else's
+        hooks[ev] = [e for e in hooks.get(ev, []) if not ours(e)]
+        if not hooks[ev]:
+            del hooks[ev]
+    if not remove:
+        if os.path.realpath(src) != os.path.realpath(dest):
+            shutil.rmtree(dest, ignore_errors=True)
+            shutil.copytree(src, dest, ignore=shutil.ignore_patterns("__pycache__"))
+        mm = os.path.join(dest, "scripts", "mm.py")
+        hooks.setdefault(ev_prompt, []).append(hook_entry(cli, f'python3 "{mm}" hook --cli {cli}', 120))
+        hooks.setdefault(ev_stop, []).append(hook_entry(cli, f'python3 "{mm}" stop-hook --cli {cli}', 15))
+    elif os.path.isfile(os.path.join(dest, "scripts", "mm.py")):
+        shutil.rmtree(dest)
+    os.makedirs(os.path.dirname(hfile), exist_ok=True)
+    if os.path.exists(hfile) and not os.path.exists(hfile + ".before-muscle-memory"):
+        shutil.copyfile(hfile, hfile + ".before-muscle-memory")
+    write_json(hfile, cfg)
+    if remove:
+        print(f"removed muscle-memory from {cli}: hooks in {hfile}, skill in {dest}")
+    else:
+        print(f"installed muscle-memory for {cli}:\n  skill  {dest}\n  hooks  {hfile} ({ev_prompt}, {ev_stop})")
+        if cli == "codex":
+            print("  Codex asks you to trust new hooks: approve them the first time it starts.")
+        print("  Your reflexes are shared with every other CLI that has it installed.")
+
+
 def run_hook(fn):
     try:
         data = json.load(sys.stdin)
@@ -765,6 +902,10 @@ def main(argv):
     if c not in VERB_ARGS:
         print(f"unknown command '{c}'\n{__doc__}", file=sys.stderr)
         return 2
+    if c in ("hook", "stop-hook") and "--cli" in rest:
+        global CLI
+        i = rest.index("--cli")
+        CLI = rest[i + 1] if i + 1 < len(rest) and rest[i + 1] in CLIS else "claude"
     if c == "hook":
         migrate_legacy()
         run_hook(prompt_hook)
@@ -787,7 +928,10 @@ def main(argv):
         migrate_legacy()
         project = project_root()
         scope = GLOBAL if only_global else project
-        if c == "match":
+        if c in ("install", "uninstall"):
+            cli = rest[rest.index("--cli") + 1] if "--cli" in rest and rest.index("--cli") + 1 < len(rest) else ""
+            cmd_install(cli, remove=c == "uninstall")
+        elif c == "match":
             m = find(project, " ".join(rest))
             if not m:
                 print("no reflex")
