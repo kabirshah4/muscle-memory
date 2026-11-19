@@ -32,7 +32,7 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 |---|:---:|:---:|:---:|
 | **Who does it** | Claude, from scratch | Claude runs a saved script | The hook runs it before Claude is called |
 | **Tool calls** | 2–7 | 1–3 | **0** |
-| **Unlocks after** | — | 3 repeats (automatic) | 2 clean runs + **your approval** |
+| **Unlocks after** | — | 2 runs (automatic) | 2 clean runs + **your approval** |
 
 > [!NOTE]
 > **Status: experimental (v0.5).** It works end to end in tests, but the benchmark has not yet shown it saving money reliably (see [Results](#measured-results)). Issues and feedback welcome.
@@ -58,7 +58,7 @@ flowchart LR
     A([You ask for a task]) --> B{Known reflex<br>for this project?}
     B -- no --> C[Claude does it by hand]
     C --> D[Stop hook counts it]
-    D -- 3rd time --> E[Claude compiles a reflex<br>script or recipe]
+    D -- 2nd time --> E[Claude compiles a reflex<br>script or recipe]
     B -- yes, reflex --> F[Claude runs it<br>1–3 tool calls]
     F -- 2 clean runs --> G[Eligible: you review<br>and approve the script]
     B -- yes, instinct --> H[Hook runs it<br>⚡ 0 tokens]
@@ -69,7 +69,7 @@ flowchart LR
 |---|---|---|
 | **Discover** | A `Stop` hook counts the tool calls in each turn. After a 3+ call turn on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
-| **Compile** | On the 3rd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
+| **Compile** | On the 2nd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
 | **Instinct** | After 2 successful runs in a row, a script reflex becomes **eligible**. A run can have no inputs, or inputs that appear word for word in your prompt: "deploy the worker to staging" run with `staging` teaches the pattern `deploy the worker to {1}`. **Only you can promote it**, in your own terminal: `mm promote <key>` shows the script, its hash and the prompt wordings and patterns it will answer to, then asks you to type `yes`. When a reflex becomes eligible, the hook tells **you** directly; that message never reaches Claude, so it costs no tokens. From then on, a prompt with the same words as an approved wording, or one that follows an approved pattern word for word, runs it with **no model call**. The slot words become the script's arguments. Editing the script revokes approval. | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
@@ -133,7 +133,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `MUSCLE_MEMORY_THRESHOLD` | `3` | repeats before compiling |
+| `MUSCLE_MEMORY_THRESHOLD` | `2` | repeats before compiling |
 | `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean no-arg runs before a reflex becomes an instinct |
 | `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
 | `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |

@@ -6,7 +6,7 @@ description: Use when starting any multi-step task that feels routine or familia
 # Muscle Memory
 
 ## Overview
-Repeated tasks shouldn't be re-reasoned from scratch. The hooks count how often a task recurs; on the 3rd manual run you compile it into a **reflex** (a script, or a short recipe when the task needs judgment). After that, run the reflex instead of exploring and re-planning.
+Repeated tasks shouldn't be re-reasoned from scratch. The hooks count how often a task recurs; on the 2nd manual run you compile it into a **reflex** (a script, or a short recipe when the task needs judgment). After that, run the reflex instead of exploring and re-planning.
 
 `MM=<this skill's base directory>/scripts/mm.py`. Reflexes belong to the **project** they were learned in (its git repository; worktrees share it) and only match there. `--global` on `log`/`save` makes one available everywhere.
 
@@ -22,7 +22,7 @@ Repeated tasks shouldn't be re-reasoned from scratch. The hooks count how often 
    - Triggers are the words a future request would use.
    - Add `--global` only if the task is identical in every project (e.g. "clean up Downloads").
    - Known tasks are counted by the hooks; you don't log them again.
-3. **Compile on the 3rd run, automatically.** When `log` prints `COMPILE NOW` or the Stop hook says "Compile it into a reflex", write the reflex straight away; it needs no approval because it only writes a file. Save it to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log).
+3. **Compile on the 2nd run, automatically.** When `log` prints `COMPILE NOW` or the Stop hook says "Compile it into a reflex", write the reflex straight away; it needs no approval because it only writes a file. Save it to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log).
 
 ## Compiling a good reflex
 

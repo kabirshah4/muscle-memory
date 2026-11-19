@@ -104,9 +104,9 @@ class Base(unittest.TestCase):
 
 class Learning(Base):
     def test_compile_threshold(self):
-        out = [self.mm("log", "x-task", "do x", "--triggers", "x") for _ in range(3)]
-        self.assertIn("2 more", out[0])
-        self.assertIn("COMPILE NOW", out[2])
+        out = [self.mm("log", "x-task", "do x", "--triggers", "x") for _ in range(2)]
+        self.assertIn("1 more", out[0])
+        self.assertIn("COMPILE NOW", out[1])
 
     def test_save_with_missing_source_keeps_existing_reflex(self):
         self.make_reflex()
@@ -381,9 +381,7 @@ class StopHook(Base):
         p = "set up the database fixtures for tests"
         self.assertEqual(self.stop(p, 5).strip(), "")                  # logged with no model turn
         self.assertIn("1 one-off task seen once", self.mm("list"))
-        self.assertEqual(self.stop("set up database fixtures for the tests", 5, sid="s2").strip(), "")
-        self.assertIn("seen=2 ", self.mm("list"))
-        out = json.loads(self.stop(p, 5, sid="s3"))
+        out = json.loads(self.stop("set up database fixtures for the tests", 5, sid="s2"))
         self.assertIn("Compile it into a reflex", out["reason"])
         self.assertIn(p, out["reason"])                                # Claude is told what the task was
 
@@ -393,11 +391,10 @@ class StopHook(Base):
 
     def test_counts_known_task_and_asks_to_compile_once(self):
         self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
-        self.assertEqual(self.stop("set up the database fixtures", 5).strip(), "")  # -> 2, silently
-        out = json.loads(self.stop("set up the database fixtures", 5))            # -> 3: compile
+        out = json.loads(self.stop("set up the database fixtures", 5))            # -> 2: compile
         self.assertIn("Compile it into a reflex", out["reason"])
         self.assertEqual(self.stop("set up the database fixtures", 5).strip(), "")  # not asked again
-        self.assertIn("seen=3 ", self.mm("list"))
+        self.assertIn("seen=2 ", self.mm("list"))
 
     def test_long_detailed_prompt_for_known_task_is_counted(self):
         self.mm("log", "csv-summary", "summarize every csv in data into data/summary.json",
@@ -456,7 +453,7 @@ class Robustness(Base):
         self.assertIn("a-task", self.mm("list"))
 
     def test_bad_env_values_fall_back_to_defaults(self):
-        self.assertIn("2 more", self.mm("log", "a-task", "a", env={"MUSCLE_MEMORY_THRESHOLD": "three"}))
+        self.assertIn("1 more", self.mm("log", "a-task", "a", env={"MUSCLE_MEMORY_THRESHOLD": "three"}))
 
     def test_usage_errors_and_help(self):
         self.assertEqual(self.rc("log"), 2)

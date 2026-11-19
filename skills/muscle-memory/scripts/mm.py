@@ -47,7 +47,7 @@ def env_int(name, default):
 
 
 ROOT = os.path.expanduser(os.environ.get("MUSCLE_MEMORY_DIR") or "~/.claude/muscle-memory")
-THRESHOLD = env_int("MUSCLE_MEMORY_THRESHOLD", 3)          # manual runs before compiling
+THRESHOLD = env_int("MUSCLE_MEMORY_THRESHOLD", 2)          # manual runs before compiling
 INSTINCT_AFTER = env_int("MUSCLE_MEMORY_INSTINCT_AFTER", 2)  # clean no-arg reflex runs before eligible
 MIN_CALLS = env_int("MUSCLE_MEMORY_MIN_CALLS", 2)          # tool calls before a turn counts as a task
 ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "0") == "1"  # 0: new tasks are logged silently, no model turn
