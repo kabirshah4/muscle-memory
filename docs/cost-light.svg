@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="372" viewBox="0 0 720 372" role="img" aria-labelledby="t d" font-family='system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif'>
+<title id="t">Cost per request, by run</title><desc id="d">Cost of the same task across 7 fresh Claude Code sessions. Runs 1-3 by hand: $0.265, $0.104, $0.248. Runs 4-6 reflex: $0.185, $0.042, $0.031. Run 7 instinct: $0, no model call.</desc>
+<rect width="720" height="372" rx="12" fill="#fcfcfb"/>
+<text x="24" y="36" font-size="17" font-weight="600" fill="#0b0b0b">Cost per request</text>
+<text x="24" y="58" font-size="13" fill="#52514e">Same task, 7 fresh sessions. The cost falls as the task moves up a tier.</text>
+<rect x="24" y="73" width="10" height="10" rx="2" fill="#2a78d6"/>
+<text x="40" y="82" font-size="12" fill="#52514e">By hand</text>
+<rect x="109" y="73" width="10" height="10" rx="2" fill="#eb6834"/>
+<text x="125" y="82" font-size="12" fill="#52514e">Reflex</text>
+<rect x="187" y="73" width="10" height="10" rx="2" fill="#1baf7a"/>
+<text x="203" y="82" font-size="12" fill="#52514e">Instinct</text>
+<text x="54" y="288.0" font-size="11" text-anchor="end" fill="#898781">$0</text>
+<line x1="64" x2="696" y1="225.33333333333331" y2="225.33333333333331" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="229.33333333333331" font-size="11" text-anchor="end" fill="#898781">$0.10</text>
+<line x1="64" x2="696" y1="166.66666666666666" y2="166.66666666666666" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="170.66666666666666" font-size="11" text-anchor="end" fill="#898781">$0.20</text>
+<line x1="64" x2="696" y1="108.0" y2="108.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="112.0" font-size="11" text-anchor="end" fill="#898781">$0.30</text>
+<path d="M97.14285714285714,284 V132.53333333333333 Q97.14285714285714,128.53333333333333 101.14285714285714,128.53333333333333 H117.14285714285714 Q121.14285714285714,128.53333333333333 121.14285714285714,132.53333333333333 V284 Z" fill="#2a78d6"/>
+<text x="109.14285714285714" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 1</text>
+<text x="109.14285714285714" y="120.53333333333333" font-size="12" font-weight="600" text-anchor="middle" fill="#0b0b0b">$0.265</text>
+<path d="M187.42857142857142,284 V226.98666666666668 Q187.42857142857142,222.98666666666668 191.42857142857142,222.98666666666668 H207.42857142857142 Q211.42857142857142,222.98666666666668 211.42857142857142,226.98666666666668 V284 Z" fill="#2a78d6"/>
+<text x="199.42857142857142" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 2</text>
+<path d="M277.7142857142857,284 V142.50666666666666 Q277.7142857142857,138.50666666666666 281.7142857142857,138.50666666666666 H297.7142857142857 Q301.7142857142857,138.50666666666666 301.7142857142857,142.50666666666666 V284 Z" fill="#2a78d6"/>
+<text x="289.7142857142857" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 3</text>
+<path d="M368.00000000000006,284 V179.46666666666667 Q368.00000000000006,175.46666666666667 372.00000000000006,175.46666666666667 H388.00000000000006 Q392.00000000000006,175.46666666666667 392.00000000000006,179.46666666666667 V284 Z" fill="#eb6834"/>
+<text x="380.00000000000006" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 4</text>
+<path d="M458.28571428571433,284 V263.36 Q458.28571428571433,259.36 462.28571428571433,259.36 H478.28571428571433 Q482.28571428571433,259.36 482.28571428571433,263.36 V284 Z" fill="#eb6834"/>
+<text x="470.28571428571433" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 5</text>
+<path d="M548.5714285714286,284 V269.81333333333333 Q548.5714285714286,265.81333333333333 552.5714285714286,265.81333333333333 H568.5714285714286 Q572.5714285714286,265.81333333333333 572.5714285714286,269.81333333333333 V284 Z" fill="#eb6834"/>
+<text x="560.5714285714286" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 6</text>
+<text x="560.5714285714286" y="257.81333333333333" font-size="12" font-weight="600" text-anchor="middle" fill="#0b0b0b">$0.031</text>
+<circle cx="650.8571428571429" cy="284" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="650.8571428571429" y="304" font-size="11" text-anchor="middle" fill="#898781">Run 7</text>
+<text x="650.8571428571429" y="270" font-size="12" font-weight="600" text-anchor="middle" fill="#0b0b0b">$0</text>
+<line x1="64" x2="696" y1="284" y2="284" stroke="#c3c2b7" stroke-width="1"/>
+<path d="M74.0,316 V320 H324.8571428571429 V316" fill="none" stroke="#c3c2b7" stroke-width="1"/>
+<text x="199.42857142857144" y="338" font-size="12" text-anchor="middle" fill="#52514e">By hand</text>
+<path d="M344.8571428571429,316 V320 H595.7142857142858 V316" fill="none" stroke="#c3c2b7" stroke-width="1"/>
+<text x="470.28571428571433" y="338" font-size="12" text-anchor="middle" fill="#52514e">Reflex</text>
+<path d="M615.7142857142858,316 V320 H686.0 V316" fill="none" stroke="#c3c2b7" stroke-width="1"/>
+<text x="650.8571428571429" y="338" font-size="12" text-anchor="middle" fill="#52514e">Instinct</text>
+<text x="650.8571428571429" y="354" font-size="11" text-anchor="middle" fill="#898781">no model call</text>
+</svg>
