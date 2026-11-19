@@ -601,6 +601,10 @@ def last_turn(transcript_path, tail_bytes=4_000_000):
                     isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
                 prompt = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
                 calls = []
+            elif isinstance(content, list):  # drop calls that failed or were denied: they aren't work done
+                failed = {b.get("tool_use_id") for b in content
+                          if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error")}
+                calls = [c for c in calls if c.get("id") not in failed]
         elif m.get("type") == "assistant" and isinstance(content, list):
             calls += [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
     return (prompt, calls) if prompt or not codex[0] else (codex[0], codex[1])

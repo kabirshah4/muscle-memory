@@ -90,7 +90,7 @@ flowchart LR
 
 | Phase | What happens | Model cost |
 |---|---|---|
-| **Discover** | A `Stop` hook counts the tool calls in each turn. After a 3+ call turn on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
+| **Discover** | A `Stop` hook counts the successful tool calls in each turn (failed or denied ones don't count). After a 3+ call turn on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
 | **Compile** | On the 2nd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
@@ -118,7 +118,7 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 
 ## Measured results
 
-`bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Raw transcripts are in `bench/raw/`.
+`bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
 
 > [!NOTE]
 > **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 4 task types, about $0.20 in total. **All 4 tasks reached instinct: answered in ~3s for $0.000, with correct output.** Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
@@ -157,7 +157,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | Env var | Default | Meaning |
 |---|---|---|
 | `MUSCLE_MEMORY_THRESHOLD` | `2` | repeats before compiling |
-| `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean no-arg runs before a reflex becomes an instinct |
+| `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean runs before a reflex becomes eligible (runs with no inputs, or with inputs copied from your prompt) |
 | `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
 | `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
@@ -195,7 +195,7 @@ python3 docs/make_charts.py             # regenerate the README chart from bench
 ## Sources
 
 **How it works and what it saves**
-- Claude Code hooks: blocking a prompt with `UserPromptSubmit`, `additionalContext`, `systemMessage` and `Stop`. [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)
+- Claude Code hooks reference: see its sections on the `UserPromptSubmit` event (`decision: "block"` stops the prompt before the model, `hookSpecificOutput.additionalContext` adds context), the common `systemMessage` output, and the `Stop` event (`decision: "block"` continues the turn). [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)
 - Claude Code plugins and skills: how the plugin and skill are packaged. [Plugins](https://code.claude.com/docs/en/plugins) · [Skills](https://code.claude.com/docs/en/skills)
 - What drives cost per request: context re-sent on every request, cache reads and writes, output tokens. [Claude Code costs](https://code.claude.com/docs/en/costs) · [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) · [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
 
@@ -207,7 +207,7 @@ python3 docs/make_charts.py             # regenerate the README chart from bench
 - OpenCode: [plugins](https://opencode.ai/docs/build/plugins/server). In-process TypeScript hooks, not command hooks.
 
 **Evidence in this repo**
-- Benchmark data: [`bench/results.csv`](bench/results.csv), with run details in [`bench/results.meta.json`](bench/results.meta.json) and condensed transcripts of every run in [`bench/raw/`](bench/raw/).
+- Benchmark data: [`bench/results.csv`](bench/results.csv), with run details in [`bench/results.meta.json`](bench/results.meta.json) and condensed transcripts of every run in [`bench/raw/`](bench/raw/) (tool calls truncated, not the full stream).
 - Demo: recorded with [vhs](https://github.com/charmbracelet/vhs) in a real Claude Code session, with no editing.
 
 ## License
