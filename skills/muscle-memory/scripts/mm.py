@@ -227,14 +227,66 @@ def is_match(text, entry, key, min_overlap, min_shared):
     return ov >= min_overlap and shared >= min_shared
 
 
+SAFE_ARG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:@+=-]{0,63}")
+SLOT = re.compile(r"\{(\d+)\}")
+
+
+def words(text):
+    return [w.strip(".,!;:\"'") for w in (text or "").split() if w.strip(".,!;:\"'")]
+
+
+def safe_arg(a):
+    return bool(SAFE_ARG.fullmatch(a)) and ".." not in a
+
+
+def make_template(prompt, args):
+    """'scaffold a billing module' + ['billing'] -> 'scaffold a {1} module', or None if args aren't in it."""
+    if not prompt or not args or len(args) > 4 or not all(safe_arg(a) for a in args):
+        return None
+    ws = words(prompt)
+    if len(ws) > INSTINCT_MAX_WORDS:
+        return None
+    out = [w.lower() for w in ws]
+    for i, a in enumerate(args, 1):
+        hits = [j for j, w in enumerate(ws) if w == a]
+        if len(hits) != 1 or SLOT.fullmatch(out[hits[0]]):
+            return None
+        out[hits[0]] = "{%d}" % i
+    return " ".join(out)
+
+
+def template_args(text, tpl):
+    """Args if the prompt is the template word for word with safe words in the slots, else None."""
+    ws, ts = words(text), tpl.split()
+    if len(ws) != len(ts):
+        return None
+    args = {}
+    for w, t in zip(ws, ts):
+        m = SLOT.fullmatch(t)
+        if m:
+            if not safe_arg(w):
+                return None
+            args[int(m.group(1))] = w
+        elif w.lower() != t:
+            return None
+    return [args[i] for i in sorted(args)]
+
+
 def instinct_match(text, entry):
-    """An instinct fires only on a short, plain request whose words equal an approved phrasing's."""
+    """Args for an approved instinct ([] for no-arg), or None. Fires only on a short, plain request
+    whose words equal an approved phrasing's, or follow an approved template word for word."""
     if "?" in text or len(text.split()) > INSTINCT_MAX_WORDS:
-        return False
+        return None
     t = toks(text)
     if not t or t & NEGATIONS:
-        return False
-    return any(t == toks(p) for p in entry.get("approved_phrasings", []))
+        return None
+    if any(t == toks(p) for p in entry.get("approved_phrasings", [])):
+        return []
+    for tpl in entry.get("approved_templates", []):
+        args = template_args(text, tpl)
+        if args is not None:
+            return args
+    return None
 
 
 def find(project, text, need_reflex=True, min_overlap=HINT_OVERLAP, min_shared=HINT_SHARED):
@@ -284,7 +336,8 @@ def file_hash(path):
 def approval_valid(scope, e):
     p = reflex_path(scope, e) if e.get("reflex") else ""
     return (e.get("instinct") and is_script(e) and os.path.exists(p)
-            and e.get("approved_sha") == file_hash(p) and e.get("approved_phrasings"))
+            and e.get("approved_sha") == file_hash(p)
+            and (e.get("approved_phrasings") or e.get("approved_templates")))
 
 
 # ---------- commands ----------
@@ -334,7 +387,7 @@ def cmd_save(scope, key, src):
     print(f"saved reflex {dest}")
 
 
-def bump(scope, key, field, with_args=None, quiet=False):
+def bump(scope, key, field, with_args=None, quiet=False, args=None):
     """Record a reflex outcome. with_args: None = recorded by hand, True/False = how `run` was called."""
     out = (lambda *a: None) if quiet else print
     with edit(scope) as idx:
@@ -348,9 +401,15 @@ def bump(scope, key, field, with_args=None, quiet=False):
                 e["streak"] = e.get("streak", 0) + 1
                 if pending and not any(toks(pending) == toks(p) for p in e.get("phrasings", [])):
                     e["phrasings"] = (e.get("phrasings", []) + [pending])[-MAX_PHRASINGS:]
-            elif with_args:
-                e["streak"] = 0
-            if (e.get("streak", 0) >= INSTINCT_AFTER and e.get("phrasings")
+            elif with_args and is_script(e):
+                tpl = make_template(pending, args)  # the args were words of the prompt: learn the pattern
+                if tpl:
+                    e["streak"] = e.get("streak", 0) + 1
+                    if tpl not in e.get("templates", []):
+                        e["templates"] = (e.get("templates", []) + [tpl])[-MAX_PHRASINGS:]
+                else:
+                    e["streak"] = 0
+            if (e.get("streak", 0) >= INSTINCT_AFTER and (e.get("phrasings") or e.get("templates"))
                     and not e.get("instinct") and not e.get("eligible")):
                 e["eligible"] = True
                 out(f"{key} is now ELIGIBLE to become an instinct. It is NOT promoted. Tell the user they can "
@@ -381,7 +440,7 @@ def cmd_run(project, key, args, only_global):
         return 0
     cwd = scope if scope != GLOBAL else os.getcwd()  # same directory an instinct would run in
     rc = subprocess.call(["python3" if path.endswith(".py") else "bash", path] + args, cwd=cwd)
-    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args))
+    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), args=args)
     return rc
 
 
@@ -391,8 +450,8 @@ def cmd_promote(project, key, only_global):
         raise StoreError("only script reflexes (.sh/.py) can become instincts")
     if not (e.get("eligible") or e.get("instinct")):
         raise StoreError(f"'{k}' is not eligible yet: it needs {INSTINCT_AFTER} clean runs in a row through "
-                         f"Claude, with no args (streak {e.get('streak', 0)}/{INSTINCT_AFTER})")
-    if not e.get("phrasings"):
+                         f"Claude, with args taken from the prompt or none (streak {e.get('streak', 0)}/{INSTINCT_AFTER})")
+    if not (e.get("phrasings") or e.get("templates")):
         raise StoreError(f"'{k}' has no recorded prompts to approve yet")
     if not sys.stdin.isatty():
         raise StoreError(f"promote asks for your confirmation, so run it yourself in a terminal: "
@@ -403,8 +462,13 @@ def cmd_promote(project, key, only_global):
     h = file_hash(path)
     print(f"Instinct review: '{k}' ({label(scope)})\n"
           f"It will run with NO model call when your whole prompt is one of these (ignoring filler words):")
-    for p in e["phrasings"]:
+    for p in e.get("phrasings", []):
         print(f"  - {p}")
+    if e.get("templates"):
+        print("or follows one of these word for word, where {1}, {2}... is any single plain word\n"
+              "(letters, digits, . _ / : @ + = -) that is passed to the script as argument 1, 2...:")
+        for t in e["templates"]:
+            print(f"  - {t}")
     print(f"Working directory: {'wherever Claude is running' if scope == GLOBAL else scope}\n"
           f"Script {path} (sha256 {h[:12]}):\n{'-' * 60}\n{body.rstrip()}\n{'-' * 60}\n"
           f"Approval covers this file only. Anything it calls (other scripts, npm/make targets) is not pinned.")
@@ -413,7 +477,8 @@ def cmd_promote(project, key, only_global):
         print("not approved")
         return 1
     with edit(scope) as idx:
-        idx[k].update(instinct=True, eligible=False, approved_sha=h, approved_phrasings=list(e["phrasings"]))
+        idx[k].update(instinct=True, eligible=False, approved_sha=h, approved_phrasings=list(e.get("phrasings", [])),
+                       approved_templates=list(e.get("templates", [])))
     print(f"{k}: instinct ON. Editing or re-saving the script revokes approval.")
     return 0
 
@@ -553,9 +618,9 @@ def prompt_hook(data):
     path = reflex_path(scope, e)
     if e.get("instinct") and not approval_valid(scope, e):
         with edit(scope) as idx:  # script changed since approval (or approved before v0.5): re-approve
-            idx[k].update(instinct=False, eligible=bool(idx[k].get("phrasings")))
-    elif e.get("instinct") and instinct_match(prompt, e):
-        rc, output = run_instinct(path, project if scope != GLOBAL else cwd)
+            idx[k].update(instinct=False, eligible=bool(idx[k].get("phrasings") or idx[k].get("templates")))
+    elif e.get("instinct") and instinct_match(prompt, e) is not None:
+        rc, output = run_instinct(path, project if scope != GLOBAL else cwd, instinct_match(prompt, e))
         if len(output) > 4000:
             output = "...\n" + output[-4000:]
         if rc == 0:

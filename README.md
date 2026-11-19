@@ -71,7 +71,7 @@ flowchart LR
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
 | **Compile** | On the 3rd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
-| **Instinct** | After 2 successful runs in a row with no args, a script reflex becomes **eligible**. **Only you can promote it**, in your own terminal: `mm promote <key>` shows the script, its hash and the prompt wordings it will answer to, then asks you to type `yes`. When a reflex becomes eligible, the hook tells **you** directly; that message never reaches Claude, so it costs no tokens. From then on, a prompt with the same words as an approved wording runs it with **no model call**. Editing the script revokes approval. | **zero** |
+| **Instinct** | After 2 successful runs in a row, a script reflex becomes **eligible**. A run can have no inputs, or inputs that appear word for word in your prompt: "deploy the worker to staging" run with `staging` teaches the pattern `deploy the worker to {1}`. **Only you can promote it**, in your own terminal: `mm promote <key>` shows the script, its hash and the prompt wordings and patterns it will answer to, then asks you to type `yes`. When a reflex becomes eligible, the hook tells **you** directly; that message never reaches Claude, so it costs no tokens. From then on, a prompt with the same words as an approved wording, or one that follows an approved pattern word for word, runs it with **no model call**. The slot words become the script's arguments. Editing the script revokes approval. | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
 
 ### Scoping
@@ -147,7 +147,7 @@ Reflexes are scripts that Claude writes and runs on your machine. They stay loca
 
 - ✅ 2 clean runs as a reflex first
 - ✅ **your explicit approval** in an interactive terminal after seeing the script (`mm promote <key>`), pinned to its sha256 hash. The hash covers that one file only, not other scripts it calls.
-- ✅ an exact match: the prompt must use the same words as a wording you approved, be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...)
+- ✅ an exact match: the prompt must use the same words as a wording you approved, be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
 - ✅ the right project (or an explicit `--global`)
 
 They're demoted on the first failure. Review yours with `mm list` and `mm show` now and then.
@@ -158,13 +158,13 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Limitations
 
 - Requests phrased with entirely different words won't find their reflex.
-- Requests with inputs ("deploy *this branch* to *prod*") stay at the reflex tier, because something has to work out the arguments.
+- Requests with inputs only skip Claude when they follow a learned pattern word for word, and each input is a single plain word. Anything else ("deploy *the branch I was just on*") goes to Claude.
 - Tested on macOS with a handful of tasks. Expect rough edges.
 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 43 end-to-end tests
+python3 -m unittest discover -v tests   # 46 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

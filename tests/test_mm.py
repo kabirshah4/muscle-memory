@@ -295,6 +295,40 @@ class Hints(Base):
             self.assertNotIn("Traceback", r.stderr, stdin)
 
 
+class Templates(Base):
+    def learn(self):
+        self.make_reflex(body='echo "deployed to $1"')
+        for env in ("staging", "prod"):
+            self.hook(f"deploy the worker to {env}")
+            self.mm("run", "deploy-worker", env)
+
+    def test_args_from_the_prompt_become_an_approvable_template(self):
+        self.learn()
+        self.assertIn("ELIGIBLE", self.mm("list"))
+        out = self.promote_tty()
+        self.assertIn("deploy the worker to {1}", out)
+        self.assertIn("instinct ON", out)
+        r = json.loads(self.hook("Deploy the worker to canary."))
+        self.assertEqual(r["decision"], "block")
+        self.assertIn("deployed to canary", r["reason"])
+
+    def test_unsafe_or_different_wording_never_fires(self):
+        self.learn()
+        self.promote_tty()
+        for p in ("deploy the worker to $(touch x)", "deploy the worker to ../etc", "deploy the worker to a b",
+                  "please deploy the worker to prod", "don't deploy the worker to prod",
+                  "deploy the worker to prod?"):
+            self.assertNotIn('"decision": "block"', self.hook(p), p)
+
+    def test_arg_not_in_prompt_resets_streak(self):
+        self.make_reflex()
+        self.hook("deploy the worker to staging")
+        self.mm("run", "deploy-worker", "staging")
+        self.hook("deploy the worker to staging")
+        self.mm("run", "deploy-worker", "something-else")
+        self.assertNotIn("ELIGIBLE", self.mm("list"))
+
+
 class Launcher(Base):
     def test_mm_key_runs_script_with_no_model_call(self):
         self.make_reflex(body='echo "args: $*"')
