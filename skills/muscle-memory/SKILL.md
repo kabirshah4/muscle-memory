@@ -13,10 +13,10 @@ Repeated tasks shouldn't be re-reasoned from scratch. Track how often a task rec
 ## Flow
 
 1. **Recall (before doing anything else):** `python3 $MM match "<one-line task description>"`
-   - **REFLEX found:** `python3 $MM show <key>`, then execute it directly.
-     - `.sh`/`.py`: run it with the task's arguments. Read only its output.
-     - `.md`: follow the steps literally. Skip any exploration the recipe doesn't call for.
-     - Success → `python3 $MM hit <key>`. Failure → `python3 $MM fail <key>`, do the task normally, then fix the reflex and re-`save` it.
+   - **REFLEX found:** `python3 $MM run <key> [args]`. Don't `show` or read the script first; that wastes the tokens the reflex saves.
+     - `.sh`/`.py`: it executes and records the outcome itself. Work from its output only.
+     - `.md`: it prints the recipe. Follow it literally, then `hit <key>` (or `fail <key>`).
+     - On failure: do the task normally, then fix the reflex and re-`save` it.
    - **No reflex:** do the task normally.
 2. **Log (after finishing a non-trivial task by hand):**
    `python3 $MM log <task-key> "<one-line summary>" --triggers "word,word,word"`
@@ -37,6 +37,7 @@ A reflex contains: the exact paths, the exact commands, the inputs as parameters
 | Command | Does |
 |---|---|
 | `match "<text>"` | find a reflex for a task |
+| `run <key> [args]` | execute a reflex, auto-record outcome |
 | `log <key> "<summary>" --triggers "a,b"` | count a manual run |
 | `save <key> <file>` | install / replace reflex |
 | `hit` / `fail <key>` | record outcome (2 fails in a row disables it) |

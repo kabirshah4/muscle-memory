@@ -10,6 +10,7 @@ Commands:
   match "<task text>"                 -> best reflex for this task, or nothing
   log <key> "<summary>" [--triggers "a,b,c"]   -> record one manual run, print count + whether to compile
   save <key> <path-to-script-or-md>   -> install a reflex for <key>
+  run <key> [args]                    -> execute a reflex, auto-record hit/fail (prints .md recipes)
   hit <key> | fail <key>              -> record reflex success / failure
   list                                -> all tasks with counts and reflex status
   show <key>                          -> print the reflex body
@@ -134,6 +135,71 @@ def cmd_list():
         print(f"{k:30} seen={e['count']:<3} {status}  - {e.get('summary','')}")
 
 
+SELF = os.path.abspath(__file__)
+MIN_CALLS = int(os.environ.get("MUSCLE_MEMORY_MIN_CALLS", "3"))
+
+
+def turn_tool_calls(transcript_path):
+    """Tool calls made since the last real user prompt in a Claude Code transcript."""
+    calls = []
+    with open(transcript_path) as f:
+        for line in f:
+            try:
+                m = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            content = (m.get("message") or {}).get("content")
+            if m.get("type") == "user" and not m.get("isMeta"):
+                is_tool_result = isinstance(content, list) and any(
+                    isinstance(b, dict) and b.get("type") == "tool_result" for b in content)
+                if not is_tool_result:
+                    calls = []  # a new user prompt starts a new turn
+            elif m.get("type") == "assistant" and isinstance(content, list):
+                calls += [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+    return calls
+
+
+def cmd_stop_hook():
+    # Stop hook: after a non-trivial turn that wasn't logged, ask Claude to log it (once).
+    try:
+        data = json.load(sys.stdin)
+        if data.get("stop_hook_active"):
+            return
+        calls = turn_tool_calls(data["transcript_path"])
+    except Exception:
+        return
+    mm_cmds = [json.dumps(c.get("input", {})) for c in calls if "mm.py" in json.dumps(c.get("input", {}))]
+    if any(re.search(r"mm\.py\W+(log|hit|fail|save)\b", s) for s in mm_cmds):
+        return  # already logged or used a reflex this turn
+    work = [c for c in calls if "mm.py" not in json.dumps(c.get("input", {}))]
+    if len(work) < MIN_CALLS:
+        return
+    keys = ", ".join(sorted(load())) or "none yet"
+    reason = (f"[muscle-memory] That task took {len(work)} tool calls. If it's the kind of task that could recur, "
+              f"log it: `python3 {SELF} log <task-key> \"<one-line summary>\" --triggers \"word,word\"`. "
+              f"Reuse an existing key if one fits (existing: {keys}). If the output says COMPILE NOW, write the "
+              f"reflex as the muscle-memory skill describes and `save` it. If it's a one-off, just stop.")
+    print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def cmd_run(key, args):
+    """Execute a script reflex (records hit/fail from exit code) or print a recipe reflex."""
+    import subprocess
+    k = slug(key)
+    e = load().get(k)
+    if not e or not e.get("reflex"):
+        sys.exit(f"no reflex for {k}")
+    path = os.path.join(REFLEXES, e["reflex"])
+    if path.endswith(".md"):
+        print(open(path).read())
+        print(f"(recipe reflex: follow it, then run `python3 {SELF} hit {k}` or `fail {k}`)")
+        return
+    interp = ["python3"] if path.endswith(".py") else ["bash"]
+    rc = subprocess.call(interp + [path] + args)
+    bump(k, "uses" if rc == 0 else "fails")
+    sys.exit(rc)
+
+
 def main(a):
     if not a:
         sys.exit(__doc__)
@@ -178,7 +244,11 @@ def main(a):
         if m:
             k, e = m
             print(f"[muscle-memory] Reflex '{k}' matches this task ({e.get('summary','')}). "
-                  f"Use the muscle-memory skill: run `mm.py show {k}` and execute it instead of re-deriving the steps.")
+                  f"Run it instead of re-deriving the steps: `python3 {SELF} run {k} [args]` (it executes the reflex and records the outcome; no need to read the script first). Only if it fails, fall back to doing the task normally.")
+    elif c == "run":
+        cmd_run(a[1], a[2:])
+    elif c == "stop-hook":
+        cmd_stop_hook()
     else:
         sys.exit(__doc__)
 
