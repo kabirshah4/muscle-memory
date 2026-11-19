@@ -8,7 +8,7 @@ A Claude Code plugin that turns your repeated tasks into reflexes,<br>
 and your proven reflexes into instincts that run with **zero tokens**.
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
-![version](https://img.shields.io/badge/version-0.6.1-2a78d6)
+![version](https://img.shields.io/badge/version-0.6.2-2a78d6)
 ![status](https://img.shields.io/badge/status-experimental-eda100)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
@@ -161,7 +161,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 69 end-to-end tests
+python3 -m unittest discover -v tests   # 70 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

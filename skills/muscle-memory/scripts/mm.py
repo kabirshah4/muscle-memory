@@ -419,12 +419,36 @@ JUNK = re.compile(r"(^|/)(__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|\
 MAX_PATHS = 2000          # bigger changes than this aren't checked (too slow, and not a routine task)
 MAX_TEXT = 2_000_000      # bytes of added content read per check
 
-def git_out(root, *args):
+def git_out(root, *args, limit=MAX_TEXT * 2):
+    """A git command's stdout, reading at most `limit` bytes (huge diffs are cut, never fully buffered)."""
     try:
-        r = subprocess.run(["git", "-C", root, *args], capture_output=True, timeout=30)
-        return r.stdout.decode("utf-8", "replace") if r.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError):
+        p = subprocess.Popen(["git", "-C", root, *args], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
         return None
+    try:
+        data = p.stdout.read(limit)
+        p.stdout.close()
+        try:
+            rc = p.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+            return None
+        if len(data) >= limit:
+            rc = 0 if rc in (0, -13, 141) else rc  # we closed the pipe early (SIGPIPE): the cut is intended
+        return data.decode("utf-8", "replace") if rc == 0 else None
+    except OSError:
+        p.kill()
+        p.wait()
+        return None
+
+
+def quick_hash(path):
+    """Size + mtime + the first 1 MB: enough to tell whether a pre-existing change was touched."""
+    st = os.stat(path)
+    with open(path, "rb") as f:
+        head = f.read(1_000_000)
+    return f"{st.st_size}:{st.st_mtime_ns}:{hashlib.sha256(head).hexdigest()}"
 
 
 def z_paths(out):
@@ -459,7 +483,7 @@ def snapshot(root):
     dirty = {}
     for path in status:
         try:
-            dirty[path] = file_hash(os.path.join(root, path))
+            dirty[path] = quick_hash(os.path.join(root, path))
         except OSError:
             dirty[path] = None
     return {"head": head, "tags": (git_out(root, "tag") or "").split(), "dirty": dirty, "t": time.time()}
@@ -479,7 +503,7 @@ def fingerprint(root, snap):
     deleted = set(z_paths(git_out(root, "diff", "--name-only", "-z", "--diff-filter=D", head0)))
     for path, h in (snap.get("dirty") or {}).items():  # already changed before and untouched since
         try:
-            if path in changed and h == file_hash(os.path.join(root, path)):
+            if path in changed and h == quick_hash(os.path.join(root, path)):
                 changed.discard(path)
         except OSError:
             pass
@@ -557,8 +581,10 @@ def compare(fps, fp):
     extra_deletes = sorted(set(fp.get("deleted", [])) - allowed_deletes)
     if extra_deletes:
         problems.append("deleted " + ", ".join(extra_deletes[:8]) + ", which the by-hand runs never did")
-    if fp["tags"] != need_tags and not (need_tags and fp["tags"] >= need_tags):
-        problems.append(f"created {fp['tags']} git tag(s), the by-hand runs created {need_tags}")
+    tag_counts = [f.get("tags", 0) for f in fps]
+    if not min(tag_counts) <= fp["tags"] <= max(tag_counts):
+        problems.append(f"created {fp['tags']} git tag(s), the by-hand runs created "
+                        + (str(tag_counts[0]) if len(set(tag_counts)) == 1 else f"{min(tag_counts)}-{max(tag_counts)}"))
     missing_tags = sorted(same_tags - set(fp.get("tag_names", [])))
     if missing_tags:
         problems.append("didn't create tag " + ", ".join(missing_tags))
@@ -681,12 +707,12 @@ def cmd_run(project, key, args, only_global):
     if rc == 0:
         with edit(scope) as idx:  # shown at `promote`, so the user approves what it produces, not just the code
             idx[k]["last_output"] = {"args": args, "text": out[-1500:]}
-            if fps and snap:
-                ok, why = compare(fps, fingerprint(project, snap))
+            if fps:  # no snapshot (no commit yet, huge change): unchecked, so it doesn't count
+                ok, why = compare(fps, fingerprint(project, snap) if snap else None)
                 idx[k]["verified"] = ok
                 idx[k]["last_check"] = "matched" if ok else why[:300]
                 counts = ok
-        if fps and snap:
+        if fps:
             print(f"\n[muscle-memory] output check: " + ("matches the by-hand runs." if ok else
                   f"DOESN'T match the by-hand runs: {why}. This run doesn't count toward instinct. If the user's "
                   f"request needed that, finish the task by hand, then fix the script and re-save it."))
@@ -957,10 +983,15 @@ def prompt_hook(data):
         t0 = time.time()
         fps = checkable(e)
         snap = snapshot(project) if fps else None
+        if fps and snap is None:  # can't check the result right now: let the model handle it
+            emit_context(f"[muscle-memory] The instinct '{k}' matched, but the repo state couldn't be captured "
+                         f"to check its result, so it wasn't run automatically. Run it with `python3 {SELF} run {k}` "
+                         f"if that's the task.")
+            return
         rc, output = run_instinct(path, project if scope != GLOBAL else cwd, instinct_match(prompt, e))
         if len(output) > 4000:
             output = "...\n" + output[-4000:]
-        if rc == 0 and fps and snap:  # the repo may have changed since approval: check every free run too
+        if rc == 0 and fps:  # the repo may have changed since approval: check every free run too
             ok, why = compare(fps, fingerprint(project, snap))
             if not ok:
                 bump(scope, k, "fails", quiet=True)

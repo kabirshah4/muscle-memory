@@ -441,8 +441,8 @@ class OutputCheck(Base):
         idx, d = self.index()
         with open(os.path.join(d, "reflexes", idx[key]["reflex"]), "a") as f:
             f.write("printf 'nothing useful\\n' > REPORT.md\n")
-        idx[key]["approved_sha"] = __import__("hashlib").sha256(
-            open(os.path.join(d, "reflexes", idx[key]["reflex"]), "rb").read()).hexdigest()
+        with open(os.path.join(d, "reflexes", idx[key]["reflex"]), "rb") as f:
+            idx[key]["approved_sha"] = __import__("hashlib").sha256(f.read()).hexdigest()
         with open(os.path.join(d, "index.json"), "w") as f:
             json.dump(idx, f)
         out = self.hook(self.PROMPT)
@@ -462,6 +462,22 @@ class OutputCheck(Base):
         self.assertTrue(mm.compare(hand, good)[0])
         self.assertIn("didn't create tag v1.5.0", mm.compare(hand, dict(good, tag_names=["v9.9.9"]))[1])
         self.assertIn("deleted src/app.py", mm.compare(hand, dict(good, deleted=["src/app.py"]))[1])
+        self.assertIn("created 2 git tag(s)", mm.compare(hand, dict(good, tags=2, tag_names=["v1.5.0", "x"]))[1])
+        self.assertIn("couldn't read the repo state", mm.compare(hand, None)[1])
+
+    def test_unreadable_repo_state_never_counts(self):
+        self.hand_run("Python 401 TypeScript 180 src/mod4.py\n", "h1")
+        self.hand_run("Python: 401, TypeScript: 180, src/mod4.py\n", "h2")
+        key = self.save("printf 'Python 401\\nTypeScript 180\\nsrc/mod4.py\\n' > REPORT.md")
+        import shutil
+        shutil.move(os.path.join(self.a, ".git"), os.path.join(self.root, "git-aside"))  # snapshot now fails
+        try:
+            self.hook(self.PROMPT)
+            out = self.mm("run", key)
+        finally:
+            shutil.move(os.path.join(self.root, "git-aside"), os.path.join(self.a, ".git"))
+        self.assertIn("DOESN'T match", out)
+        self.assertIn("instinct-in=2", self.mm("list"))
 
     def test_odd_filenames_are_tracked(self):
         import importlib.util
