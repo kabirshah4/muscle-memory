@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-11-19
+- Fail safe: if the repo state can't be captured, a script run doesn't count and an instinct isn't run automatically
+- Exact tag count: a script that makes more tags than the by-hand runs fails the check
+- Bounded git reads and hashing on big repos
+- Docs say plainly that extra file changes aren't flagged
+
 ## 0.6.1 — 2026-11-19
 - Approved instincts are output-checked on every free run, and demoted if the result stops matching the by-hand runs
 - Output check also fails on unexpected deletions, wrong tag names, and much less content than by hand
