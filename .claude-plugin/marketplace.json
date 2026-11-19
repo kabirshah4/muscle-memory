@@ -1,0 +1,14 @@
+{
+  "name": "muscle-memory",
+  "owner": {
+    "name": "kabirshah4"
+  },
+  "description": "Turn repeated Claude Code tasks into reflexes that save tokens.",
+  "plugins": [
+    {
+      "name": "muscle-memory",
+      "source": "./",
+      "description": "Turn repeated tasks into reflexes so Claude stops spending tokens re-deriving them."
+    }
+  ]
+}
