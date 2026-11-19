@@ -192,6 +192,24 @@ python3 -m unittest discover -v tests   # 57 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 
+## Sources
+
+**How it works and what it saves**
+- Claude Code hooks: blocking a prompt with `UserPromptSubmit`, `additionalContext`, `systemMessage` and `Stop`. [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)
+- Claude Code plugins and skills: how the plugin and skill are packaged. [Plugins](https://code.claude.com/docs/en/plugins) · [Skills](https://code.claude.com/docs/en/skills)
+- What drives cost per request: context re-sent on every request, cache reads and writes, output tokens. [Claude Code costs](https://code.claude.com/docs/en/costs) · [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) · [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+
+**Other CLIs** (the adapters follow these documented formats)
+- Codex CLI: [hooks](https://developers.openai.com/codex/hooks/) · [skills](https://developers.openai.com/codex/skills/)
+- Gemini CLI: [hooks reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md)
+- Cursor: [hooks](https://cursor.com/docs/hooks)
+- GitHub Copilot CLI: [hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference). Its prompt hook can't block, which is why it's skill-only here.
+- OpenCode: [plugins](https://opencode.ai/docs/build/plugins/server). In-process TypeScript hooks, not command hooks.
+
+**Evidence in this repo**
+- Benchmark data: [`bench/results.csv`](bench/results.csv), with run details in [`bench/results.meta.json`](bench/results.meta.json) and condensed transcripts of every run in [`bench/raw/`](bench/raw/).
+- Demo: recorded with [vhs](https://github.com/charmbracelet/vhs) in a real Claude Code session, with no editing.
+
 ## License
 
 MIT
