@@ -13,7 +13,7 @@ and your proven reflexes into instincts that run with **zero tokens**.
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
 
-[Install](#install) · [How it works](#how-it-works) · [Results](#measured-results) · [Commands](#commands) · [Safety](#safety)
+[Results](#measured-results) · [Install](#install) · [How it works](#how-it-works) · [Commands](#commands) · [Safety](#safety)
 
 </div>
 
@@ -41,6 +41,23 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 
 > [!NOTE]
 > **Status: experimental (v0.6).** It works end to end, and the latest benchmark blocked every wrong result, but only 1 of 5 tasks qualified for zero-token runs (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
+
+## Measured results
+
+`bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
+
+> [!NOTE]
+> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 5 task types including a realistic release (version bump, changelog, commit, tag), about $0.26 in total. **No wrong output got through to a zero-token run.** One task (`changelog`) reached zero-token runs, answering in 3s for $0.000.
+
+| Task | By hand | Reflex | Instinct | Control (plugin off) | Why it did or didn't reach instinct |
+|---|---:|---:|---:|---:|---|
+| changelog | $0.006 | $0.002 | **$0.000** | $0.004 | script's result matched the by-hand runs |
+| csv | $0.007 | $0.002 | n/a | $0.006 | one clean run short of the two needed |
+| report | $0.007 | $0.005 | n/a | $0.007 | **blocked, correctly**: the script left out the language names (2 of 3 runs wrong) |
+| release | $0.007 | $0.007 | n/a | $0.005 | **blocked, correctly**: the script skipped changelog entries (2 of 3 runs wrong) |
+| scaffold | $0.006 | $0.007 | n/a | $0.007 | blocked: the output didn't mention the `core` module the by-hand runs did (strict) |
+
+Medians. **What this shows:** a script the model compiles can run cleanly and still be wrong. In an earlier run, before the output check, three zero-token runs produced wrong output. The check compares each script run with the by-hand runs and now stops that. The cost is reach: fewer tasks qualify, and on a cheap model many compiled scripts genuinely aren't good enough. Run-to-run variation is large at this sample size. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Install
 
@@ -99,23 +116,6 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 ```
 
 </details>
-
-## Measured results
-
-`bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
-
-> [!NOTE]
-> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 5 task types including a realistic release (version bump, changelog, commit, tag), about $0.26 in total. **No wrong output got through to a zero-token run.** One task (`changelog`) reached zero-token runs, answering in 3s for $0.000.
-
-| Task | By hand | Reflex | Instinct | Control (plugin off) | Why it did or didn't reach instinct |
-|---|---:|---:|---:|---:|---|
-| changelog | $0.006 | $0.002 | **$0.000** | $0.004 | script's result matched the by-hand runs |
-| csv | $0.007 | $0.002 | n/a | $0.006 | one clean run short of the two needed |
-| report | $0.007 | $0.005 | n/a | $0.007 | **blocked, correctly**: the script left out the language names (2 of 3 runs wrong) |
-| release | $0.007 | $0.007 | n/a | $0.005 | **blocked, correctly**: the script skipped changelog entries (2 of 3 runs wrong) |
-| scaffold | $0.006 | $0.007 | n/a | $0.007 | blocked: the output didn't mention the `core` module the by-hand runs did (strict) |
-
-Medians. **What this shows:** a script the model compiles can run cleanly and still be wrong. In an earlier run, before the output check, three zero-token runs produced wrong output. The check compares each script run with the by-hand runs and now stops that. The cost is reach: fewer tasks qualify, and on a cheap model many compiled scripts genuinely aren't good enough. Run-to-run variation is large at this sample size. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
 
