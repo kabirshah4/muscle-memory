@@ -295,6 +295,24 @@ class Hints(Base):
             self.assertNotIn("Traceback", r.stderr, stdin)
 
 
+class Launcher(Base):
+    def test_mm_key_runs_script_with_no_model_call(self):
+        self.make_reflex(body='echo "args: $*"')
+        out = json.loads(self.hook("mm deploy-worker staging --fast"))
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("args: staging --fast", out["reason"])
+        self.assertIn("uses=1", self.mm("list"))
+
+    def test_failure_is_reported_and_recorded(self):
+        self.make_reflex(body="echo boom; exit 3")
+        self.assertIn("failed (exit 3)", json.loads(self.hook("mm deploy-worker"))["reason"])
+
+    def test_unknown_key_or_plain_prompt_falls_through(self):
+        self.make_reflex()
+        self.assertEqual(self.hook("mm what do you think").strip(), "")
+        self.assertNotIn("block", self.hook("mm deploy-worker'unclosed"))  # bad quoting: not launched
+
+
 class StopHook(Base):
     def transcript(self, prompt, n_calls, extra=None, name="t.jsonl"):
         p = os.path.join(self.root, name)
@@ -317,7 +335,7 @@ class StopHook(Base):
         return self.mm("stop-hook", stdin=json.dumps(data), env=env)
 
     def test_ignores_small_turns(self):
-        self.assertEqual(self.stop("rename a variable", 2).strip(), "")
+        self.assertEqual(self.stop("rename a variable", 1).strip(), "")
 
     def test_opt_in_ask_new_task_once_per_session(self):
         ask = {"MUSCLE_MEMORY_ASK": "1"}

@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -48,7 +49,7 @@ def env_int(name, default):
 ROOT = os.path.expanduser(os.environ.get("MUSCLE_MEMORY_DIR") or "~/.claude/muscle-memory")
 THRESHOLD = env_int("MUSCLE_MEMORY_THRESHOLD", 3)          # manual runs before compiling
 INSTINCT_AFTER = env_int("MUSCLE_MEMORY_INSTINCT_AFTER", 2)  # clean no-arg reflex runs before eligible
-MIN_CALLS = env_int("MUSCLE_MEMORY_MIN_CALLS", 3)          # tool calls before a turn counts as a task
+MIN_CALLS = env_int("MUSCLE_MEMORY_MIN_CALLS", 2)          # tool calls before a turn counts as a task
 ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "0") == "1"  # 0: new tasks are logged silently, no model turn
 MAX_AUTO = 100  # silently logged candidates kept per project
 # Overlap = shared words / the smaller of (prompt words, task words), so long detailed prompts still match.
@@ -500,8 +501,8 @@ def last_turn(transcript_path, tail_bytes=4_000_000):
     return prompt, calls
 
 
-def run_instinct(path, cwd):
-    p = subprocess.Popen(["python3" if path.endswith(".py") else "bash", path], cwd=cwd,
+def run_instinct(path, cwd, args=()):
+    p = subprocess.Popen(["python3" if path.endswith(".py") else "bash", path, *args], cwd=cwd,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     try:
         out, _ = p.communicate(timeout=INSTINCT_TIMEOUT)
@@ -512,11 +513,39 @@ def run_instinct(path, cwd):
         return 124, f"timed out after {INSTINCT_TIMEOUT}s"
 
 
+LAUNCH = re.compile(r"^mm\s+([a-z0-9][a-z0-9-]*)(\s+.*)?$", re.S)
+
+
+def launch(project, cwd, prompt):
+    """`mm <key> [args]` typed as the whole prompt runs that script reflex with no model call.
+    The user named the reflex explicitly, so no matching or approval is involved."""
+    m = LAUNCH.match(prompt.strip())
+    if not m:
+        return False
+    try:
+        scope, k, e = resolve(project, m.group(1))
+        args = shlex.split(m.group(2) or "")
+    except (StoreError, ValueError):
+        return False  # not a known reflex: an ordinary prompt that happens to start with "mm"
+    if not is_script(e) or not os.path.exists(reflex_path(scope, e)):
+        return False
+    rc, output = run_instinct(reflex_path(scope, e), project if scope != GLOBAL else cwd, args)
+    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), quiet=True)
+    if len(output) > 4000:
+        output = "...\n" + output[-4000:]
+    status = "ran" if rc == 0 else f"failed (exit {rc}) running"
+    print(json.dumps({"decision": "block", "reason":
+        f"⚡ muscle-memory {status} '{k}' with no model call.\n\n{output}"}))
+    return True
+
+
 def prompt_hook(data):
     prompt, cwd = data.get("prompt") or "", data.get("cwd") or os.getcwd()
     if BYPASS in prompt.lower():
         return
     project = project_root(cwd)
+    if launch(project, cwd, prompt):
+        return
     m = find(project, prompt)
     if not m:
         return

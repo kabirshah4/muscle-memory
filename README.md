@@ -98,18 +98,20 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 `bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Raw transcripts are in `bench/raw/`.
 
 > [!CAUTION]
-> **Honest result: not proven yet.** In the last complete run (plugin commit `a65ce8b`, 2026-11-19), Claude **never actually used a reflex** (0 of 12 runs) and no task reached instinct. The cost differences below are run-to-run noise, not savings. The cause (long prompts weren't counted as repeats) is fixed in v0.5, but a new benchmark run hasn't been done yet.
+> **Honest result: no savings shown yet.** Latest run: Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, about $0.22 in total. Claude used a reflex in only 3 of 12 reflex runs, because on Haiku most tasks took just 2–3 tool calls and weren't recognised as repeats until late. No task reached instinct. At about $0.006 per task, most of the cost is fixed per request, so a reflex can't save much. **Only skipping the model call does.** That's what instincts and the `mm <key>` shortcut below are for.
 
 | Task | By hand | Reflex runs | Control (plugin off) | Reflex used |
 |---|---:|---:|---:|:---:|
-| report | $0.223 | $0.156 | $0.201 | 0/3 |
-| changelog | $0.197 | $0.074 | $0.141 | 0/3 |
-| csv | $0.224 | $0.208 | $0.162 | 0/3 |
-| scaffold | $0.211 | $0.193 | $0.208 | 0/3 |
+| report | $0.006 | $0.008 | $0.007 | 1/3 |
+| changelog | $0.006 | $0.007 | $0.005 | 1/3 |
+| csv | $0.006 | $0.005 | $0.005 | 1/3 |
+| scaffold | $0.006 | $0.007 | $0.008 | 0/3 |
 
-Medians. An earlier single-task demo (v0.3) did reach instinct, answering in ~3s for $0.000, but that was one task and not a controlled comparison. Reproduce with `python3 bench/run.py` (costs roughly $3–6), then `python3 bench/summarize.py`.
+Medians. Earlier runs on the default model (Opus) showed the same pattern at 20–30× the cost. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
+
+**Zero-token shortcut:** type `mm <key> [args]` as your whole prompt (for example `mm deploy-worker staging`). The hook runs that script reflex and shows you the output. Claude is never called, and since you named the reflex yourself, it needs no approval or matching. Any other prompt that starts with "mm" goes to Claude as normal.
 
 To skip reflexes for one prompt, include the phrase **`no reflex`**. To manage them yourself:
 
@@ -133,7 +135,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 |---|---|---|
 | `MUSCLE_MEMORY_THRESHOLD` | `3` | repeats before compiling |
 | `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean no-arg runs before a reflex becomes an instinct |
-| `MUSCLE_MEMORY_MIN_CALLS` | `3` | tool calls in a turn before it counts as a task |
+| `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
 | `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
 
@@ -162,7 +164,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 40 end-to-end tests
+python3 -m unittest discover -v tests   # 43 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

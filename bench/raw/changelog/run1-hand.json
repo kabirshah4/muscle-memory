@@ -4,27 +4,27 @@
  "events": [
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git tag --sort=-creatordate | head; git describe --tags --abbrev=0; echo ---; git log --oneline $(git describe --tags --abbrev=0)..HEAD; echo ---; cat CHANGELOG.md\", \"description\": \"Find last tag, commits since, and changelog\"}"
+   "input": "{\"command\": \"echo \\\"TAG: $(git describe --tags --abbrev=0 2>/dev/null)\\\" && echo \\\"---COMMITS---\\\" && git log --no-merges --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD && echo \\\"---CHANGELOG---\\\" && head -40 CHANGELOG.md\", \"description\": \"Find last tag, list commits since, show changelog head\"}"
   },
   {
-   "tool": "Bash",
-   "input": "{\"command\": \"cat > CHANGELOG.md <<'EOF'\\n# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- **api:** pagination support\\n- add export command\\n\\n### Fixes\\n\\n- **cli:** exit code on error\\n- crash on empty input\\n\\n### Documentation\\n\\n- usage examples\\n\\n## v0.1.0\\n\\n- Initial release\\nEOF\\ngit diff --stat\", \"description\": \"Write Unreleased section to changelog\"}"
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-9bg62erm/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command (6f3759e)\\n- Add pagination support to the API (8e28132)\\n\\n### Fixes\\n\\n- Fix crash on empty input (2c45177)\\n- Fix CLI exit code on err"
   },
   {
-   "text": "I added an \"Unreleased\" section to `CHANGELOG.md`, above the existing v0.1.0 entry. It covers the commits since the last tag, `v0.1.0`:\n\n- **Features:** **api:** pagination support; add export command\n- **Fixes:** **cli:** exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out the `chore: bump deps` commit as you asked. Commit scopes like `api` and `cli` are shown"
+   "text": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`. It covers the five non-chore commits since the last tag (`v0.1.0`):\n\n- **Features**\n  - Add export command (`6f3759e`)\n  - Add pagination support to the API (`8e28132`)\n- **Fixes**\n  - Fix crash on empty input (`2c45177`)\n  - Fix CLI exit code on error (`1f61d54`)\n- **Documentation**\n  - Add usage examples (`df9b3e1`)\n\nI"
   },
   {
    "subtype": "success",
-   "total_cost_usd": 0.20923879999999997,
+   "total_cost_usd": 0.0060956299999999995,
    "num_turns": 3,
-   "duration_ms": 7523,
+   "duration_ms": 6339,
    "usage": {
     "input_tokens": 6,
-    "cache_creation_input_tokens": 22897,
-    "cache_read_input_tokens": 77694,
-    "output_tokens": 525,
+    "cache_creation_input_tokens": 24011,
+    "cache_read_input_tokens": 79483,
+    "output_tokens": 996,
     "output_tokens_details": {
-     "thinking_tokens": 0
+     "thinking_tokens": 200
     },
     "server_tool_use": {
      "web_search_requests": 0,
@@ -32,19 +32,19 @@
     },
     "service_tier": "standard",
     "cache_creation": {
-     "ephemeral_1h_input_tokens": 22897,
+     "ephemeral_1h_input_tokens": 24011,
      "ephemeral_5m_input_tokens": 0
     },
     "inference_geo": "global",
     "iterations": [
      {
       "input_tokens": 2,
-      "output_tokens": 175,
-      "cache_read_input_tokens": 33546,
-      "cache_creation_input_tokens": 237,
+      "output_tokens": 250,
+      "cache_read_input_tokens": 34466,
+      "cache_creation_input_tokens": 556,
       "cache_creation": {
        "ephemeral_5m_input_tokens": 0,
-       "ephemeral_1h_input_tokens": 237
+       "ephemeral_1h_input_tokens": 556
       },
       "type": "message"
      }
@@ -52,7 +52,7 @@
     "speed": "standard",
     "fallback_credit": null
    },
-   "result": "I added an \"Unreleased\" section to `CHANGELOG.md`, above the existing v0.1.0 entry. It covers the commits since the last tag, `v0.1.0`:\n\n- **Features:** **api:** pagination support; add export command\n- **Fixes:** **cli:** exit code on error; crash on empty input\n- **Documentation:** usage examples\n\nI left out the `chore: bump deps` commit as you asked. Commit scopes like `api` and `cli` are shown in bold before each entry. I haven't committed the change."
+   "result": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`. It covers the five non-chore commits since the last tag (`v0.1.0`):\n\n- **Features**\n  - Add export command (`6f3759e`)\n  - Add pagination support to the API (`8e28132`)\n- **Fixes**\n  - Fix crash on empty input (`2c45177`)\n  - Fix CLI exit code on error (`1f61d54`)\n- **Documentation**\n  - Add usage examples (`df9b3e1`)\n\nI skipped `9f1ba57` (chore: bump deps). The entries are written from the commit subjects only; I didn't read the diffs, so the wording may need tightening. I haven't committed the change."
   }
  ]
 }

@@ -1,8 +1,8 @@
 {
   "date": "2026-11-19",
   "claude_cli": "2.1.328 (Claude Code)",
-  "model": "CLI default",
-  "plugin_commit": "a65ce8b",
+  "model": "claude-haiku-5-5",
+  "plugin_commit": "bb225d5",
   "platform": "macOS-27.3-arm64-arm-64bit-Mach-O",
   "tasks": [
     "report",

@@ -4,46 +4,49 @@
  "events": [
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git ls-files && ls -la data; cat data/summary.json 2>/dev/null; for f in $(git ls-files '*.csv'); do echo \\\"== $f\\\"; wc -l \\\"$f\\\"; head -5 \\\"$f\\\"; done\", \"description\": \"List repo files and preview CSVs and summary\"}"
+   "input": "{\"command\": \"ls -la && ls -la data && cat data/summary.json 2>/dev/null | head -100\", \"description\": \"List data directory and show existing summary\"}"
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"cat -A data/sales.csv | tail -3; cat -A data/users.csv | tail -2; git log --all --oneline -- data/summary.json\", \"description\": \"Check full CSV contents and summary.json history\"}"
+   "input": "{\"command\": \"cat data/sales.csv; echo ---; cat data/users.csv; echo ---; git status --short; git log --oneline -3 -- data/summary.json\", \"description\": \"Show CSV contents and git status of summary\"}"
+  },
+  {
+   "text": "No `data/summary.json` exists yet, and it isn't in git history, so I'll generate it from the two CSVs."
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"cat -e data/sales.csv data/users.csv\", \"description\": \"Show CSV contents with line endings\"}"
+   "input": "{\"command\": \"python3 -I -c '\\nimport csv, json, os, statistics\\nout = {}\\nfor name in [\\\"sales.csv\\\", \\\"users.csv\\\"]:\\n    with open(os.path.join(\\\"data\\\", name), newline=\\\"\\\") as f:\\n        rows = list(csv.DictReader(f))\\n    cols = {}\\n    for c in rows[0].keys():\\n        vals = [r[c] for r in rows]\\n        try:\\n            nums = [float(v) for v in vals]\\n            cols[c] = {\\\"type\\\": \\\""
   },
   {
-   "tool": "Bash",
-   "input": "{\"command\": \"python3 -I - <<'EOF'\\nimport csv, json\\nfrom collections import Counter\\ndef summarize(path):\\n    rows = list(csv.DictReader(open(path, newline='')))\\n    cols = list(rows[0].keys())\\n    out = {\\\"rows\\\": len(rows), \\\"columns\\\": {}}\\n    for c in cols:\\n        vals = [r[c] for r in rows]\\n        try:\\n            nums = [float(v) for v in vals]\\n            out[\\\"columns\\\"][c] = {\\"
-  },
-  {
-   "text": "I wrote `data/summary.json` from scratch. There was no earlier version to redo: the file wasn't in the working tree or anywhere in git history, which only holds the commit that added the two CSVs. So I couldn't match any format you had before.\n\nWhat it contains:\n\n- **`sales.csv`** (5 rows): sales per region, with `north` appearing twice. Units range from 3 to 20 (mean 10.2) and prices from 8.25 to"
+   "text": "I generated `data/summary.json` from the two CSVs. No summary existed before, so this is a new file rather than a redo. I did not commit it.\n\nIt covers both files:\n- **sales.csv** (5 rows): units total 51, price range 8.25\u201315.00, and total revenue (units \u00d7 price) of 486.5.\n- **users.csv** (3 rows): ages 24\u201345 with a mean of 33.33, and plans of 2 pro and 1 free.\n\nEach file entry lists its row count"
   },
   {
    "tool": "Skill",
-   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"compile csv-summary-json\"}"
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"Compile the repeated task 'summarize-every-csv-data' into a reflex, with every argument given a default.\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/tmp/mm-scratch/summarize-every-csv-data.sh\", \"content\": \"#!/usr/bin/env bash\\n# Summarize every CSV in a directory into a JSON file.\\n# Per file: row count, column names, and min/max/mean for numeric columns.\\n# Usage: summarize-every-csv-data.sh [DATA_DIR=data] [OUT_FILE=data/summary.json]\\n# Run from the project root (mm run does this).\\nset -euo pipefail\\n\\nDATA_DIR=\\\"${1:-data}"
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/csv-summary-json.py <<'EOF'\\n#!/usr/bin/env python3\\n\\\"\\\"\\\"Summarize every CSV in a dir into one JSON file. Args: [data_dir=data] [out=<data_dir>/summary.json]\\\"\\\"\\\"\\nimport csv, glob, json, os, sys\\nfrom collections import Counter\\n\\ndata_dir = sys.argv[1] if len(sys.argv) > 1 else \\\"data\\\"\\nout_path = sys.argv[2] if len(sys.argv) > 2"
+   "input": "{\"command\": \"bash /tmp/mm-scratch/summarize-every-csv-data.sh && python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save summarize-every-csv-data /tmp/mm-scratch/summarize-every-csv-data.sh\", \"description\": \"Test the reflex script then save it to muscle memory\"}"
   },
   {
-   "text": "The CSV summary task is now saved as a reusable script under the name `csv-summary-json`. Next time you ask for this summary, it runs the script instead of redoing the work by hand.\n\n- **What it does:** it summarizes every `*.csv` in a folder into one JSON file, in the same format I made earlier. Number columns get min, max, mean and sum; text columns get counts per value. Any CSV with `region`, `"
+   "text": "I compiled the reflex and saved it. Running it rewrote `data/summary.json` in the format the logged task asks for, so the earlier revenue total and per-category counts are gone.\n\n- **Reflex:** `summarize-every-csv-data.sh`, saved to the project's muscle-memory store. It takes two optional arguments: the data directory (default `data`) and the output file (default `data/summary.json`). It runs from"
   },
   {
    "subtype": "success",
-   "total_cost_usd": 0.1752166,
+   "total_cost_usd": 0.00553997,
    "num_turns": 9,
-   "duration_ms": 37812,
+   "duration_ms": 19888,
    "usage": {
-    "input_tokens": 18,
-    "cache_creation_input_tokens": 6264,
-    "cache_read_input_tokens": 277663,
-    "output_tokens": 3475,
+    "input_tokens": 14,
+    "cache_creation_input_tokens": 6491,
+    "cache_read_input_tokens": 248737,
+    "output_tokens": 3506,
     "output_tokens_details": {
-     "thinking_tokens": 382
+     "thinking_tokens": 923
     },
     "server_tool_use": {
      "web_search_requests": 0,
@@ -51,19 +54,19 @@
     },
     "service_tier": "standard",
     "cache_creation": {
-     "ephemeral_1h_input_tokens": 6264,
+     "ephemeral_1h_input_tokens": 6491,
      "ephemeral_5m_input_tokens": 0
     },
     "inference_geo": "global",
     "iterations": [
      {
       "input_tokens": 2,
-      "output_tokens": 304,
-      "cache_read_input_tokens": 38010,
-      "cache_creation_input_tokens": 1400,
+      "output_tokens": 397,
+      "cache_read_input_tokens": 38837,
+      "cache_creation_input_tokens": 1538,
       "cache_creation": {
        "ephemeral_5m_input_tokens": 0,
-       "ephemeral_1h_input_tokens": 1400
+       "ephemeral_1h_input_tokens": 1538
       },
       "type": "message"
      }
@@ -71,7 +74,7 @@
     "speed": "standard",
     "fallback_credit": null
    },
-   "result": "The CSV summary task is now saved as a reusable script under the name `csv-summary-json`. Next time you ask for this summary, it runs the script instead of redoing the work by hand.\n\n- **What it does:** it summarizes every `*.csv` in a folder into one JSON file, in the same format I made earlier. Number columns get min, max, mean and sum; text columns get counts per value. Any CSV with `region`, `units` and `price` columns also gets revenue by region and a total. It prints a one-line confirmation when done.\n- **Defaults:** with no arguments it reads `data/` and writes `data/summary.json`. You can pass a different folder or output path.\n- **Checked:** I ran it on your data and its output matched the `data/summary.json` from earlier exactly. That run rewrote the file with the same content, and it's still not committed."
+   "result": "I compiled the reflex and saved it. Running it rewrote `data/summary.json` in the format the logged task asks for, so the earlier revenue total and per-category counts are gone.\n\n- **Reflex:** `summarize-every-csv-data.sh`, saved to the project's muscle-memory store. It takes two optional arguments: the data directory (default `data`) and the output file (default `data/summary.json`). It runs from the project root and was tested there before saving.\n- **Output per CSV:** row count, column names, and min/max/mean for numeric columns. Text columns are listed by name only.\n- **Behavior change:** I dropped the categorical counts and the sales revenue figure from my first summary, because the logged task only asks for row counts, column names, and min/max/mean. If you want those back, tell me and I'll add them to the reflex."
   }
  ]
 }
