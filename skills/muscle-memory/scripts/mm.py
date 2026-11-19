@@ -73,7 +73,7 @@ NEGATIONS = set((
 VERB_ARGS = {  # command -> (minimum positional args, usage)
     "match": (1, 'match "<task text>"'),
     "log": (1, 'log [--global] <key> "<summary>" [--triggers a,b]'),
-    "save": (2, "save [--global] <key> <file>"),
+    "save": (2, "save [--global] <key> <file> [--summary \"what it does, in general terms\"]"),
     "run": (1, "run [--global] <key> [args...]"),
     "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
     "promote": (1, "promote [--global] <key>"), "demote": (1, "demote [--global] <key>"),
@@ -360,7 +360,7 @@ def cmd_log(scope, key, summary, triggers):
         print(f"{THRESHOLD - e['count']} more run(s) before compiling")
 
 
-def cmd_save(scope, key, src):
+def cmd_save(scope, key, src, summary=None):
     key = slug(key)
     ext = os.path.splitext(src)[1]
     if ext not in (".sh", ".py", ".md"):
@@ -384,6 +384,8 @@ def cmd_save(scope, key, src):
         e = idx.setdefault(key, new_entry())
         e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False,
                  approved_sha=None, approved_phrasings=[], compile_asked=False)
+        if summary:
+            e["summary"] = summary.strip()[:200]
     print(f"saved reflex {dest}")
 
 
@@ -636,7 +638,9 @@ def prompt_hook(data):
     with edit(scope) as idx:  # remember the wording; a clean `run` turns it into an approvable phrasing
         idx[k]["pending_prompt"] = prompt.strip()[:300]
     hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match. If that is the task, run "
-            f"`python3 {SELF} run {k} [args]` as your first step and answer briefly from its output; don't "
+            f"`python3 {SELF} run {k} [args]` as your first step"
+            + (" (it's a script: different names or values just become its args)" if is_script(e) else "")
+            + "; answer briefly from its output; don't "
             f"explore or re-check what it already did. If it fails, do the task normally.")
     out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": hint}}
     if e.get("eligible"):  # shown to the user only: costs no model tokens
@@ -698,7 +702,7 @@ def stop_hook(data):
         if ask:
             block(f"'{k}' ({idx[k].get('summary', '')}) has now been done {THRESHOLD} times by hand. Compile it into a reflex now, as the "
                   f"muscle-memory skill describes (give every argument a default), then `python3 {SELF} save "
-                  + ("--global " if scope == GLOBAL else "") + f"{k} <file>`.")
+                  + ("--global " if scope == GLOBAL else "") + f"{k} <file> --summary \"<what it does, in general terms, without this run's specific names>\"`.")
         return
     if not ASK_NEW:
         auto_log(project, prompt)
@@ -782,7 +786,15 @@ def main(argv):
                 rest = rest[:i] + rest[i + 2:]
             cmd_log(scope, rest[0], " ".join(rest[1:]), trig)
         elif c == "save":
-            cmd_save(scope, rest[0], rest[1])
+            summary = None
+            if "--summary" in rest:
+                i = rest.index("--summary")
+                summary = rest[i + 1] if i + 1 < len(rest) else None
+                rest = rest[:i] + rest[i + 2:]
+            if len(rest) < 2:
+                print(f"usage: mm.py {VERB_ARGS[c][1]}", file=sys.stderr)
+                return 2
+            cmd_save(scope, rest[0], rest[1], summary)
         elif c == "run":
             return cmd_run(project, rest[0], rest[1:], only_global)
         elif c in ("hit", "fail"):

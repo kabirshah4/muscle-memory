@@ -108,6 +108,12 @@ class Learning(Base):
         self.assertIn("1 more", out[0])
         self.assertIn("COMPILE NOW", out[1])
 
+    def test_save_summary_replaces_specific_one(self):
+        script = self.make_reflex()
+        self.mm("save", "deploy-worker", script, "--summary", "deploy a worker to an environment")
+        self.assertIn("deploy a worker to an environment", self.mm("list"))
+        self.assertIn("different names or values", self.hook("deploy the worker"))
+
     def test_save_with_missing_source_keeps_existing_reflex(self):
         self.make_reflex()
         out = self.mm("save", "deploy-worker", "/nope/missing.sh")

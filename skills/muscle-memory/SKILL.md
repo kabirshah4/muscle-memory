@@ -22,7 +22,7 @@ Repeated tasks shouldn't be re-reasoned from scratch. The hooks count how often 
    - Triggers are the words a future request would use.
    - Add `--global` only if the task is identical in every project (e.g. "clean up Downloads").
    - Known tasks are counted by the hooks; you don't log them again.
-3. **Compile on the 2nd run, automatically.** When `log` prints `COMPILE NOW` or the Stop hook says "Compile it into a reflex", write the reflex straight away; it needs no approval because it only writes a file. Save it to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log).
+3. **Compile on the 2nd run, automatically.** When `log` prints `COMPILE NOW` or the Stop hook says "Compile it into a reflex", write the reflex straight away; it needs no approval because it only writes a file. Save it to the scratchpad, then `python3 $MM save <key> <file> --summary "<what it does in general terms>"` (same `--global` choice as the log). Keep the summary free of this run's specific names or values, so it matches the next run with different ones.
 
 ## Compiling a good reflex
 
