@@ -15,7 +15,7 @@ run 7+:    "repo health report again"       → INSTINCT: hook runs it, 0 tokens
 
 ## Install
 
-Requires Claude Code, `python3` (3.9+, standard library only) and `bash`. **macOS and Linux only.** Windows is untested and file locking is disabled there.
+Requires Claude Code, `python3` (3.10+, standard library only) and `bash`. **macOS and Linux only.** Windows is untested and file locking is disabled there.
 
 ```
 /plugin marketplace add kabirshah4/muscle-memory
