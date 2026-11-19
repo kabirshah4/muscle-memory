@@ -1,6 +1,6 @@
 {
   "name": "muscle-memory",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Repeat a task enough times and Claude compiles it into a reflex: a script or terse recipe it runs next time instead of re-reasoning from scratch.",
   "author": { "name": "kabirshah4" },
   "homepage": "https://github.com/kabirshah4/muscle-memory",
