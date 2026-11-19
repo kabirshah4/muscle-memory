@@ -8,7 +8,7 @@ description: Use when starting any multi-step task that feels routine or familia
 ## Overview
 Repeated tasks shouldn't be re-reasoned from scratch. Track how often a task recurs; after 3 runs, compile it into a **reflex** (a parameterized script or a terse recipe). After that, recall the reflex and execute it with no exploring or re-planning.
 
-`MM=<this skill's base directory>/scripts/mm.py` (state lives in `~/.claude/muscle-memory/`)
+`MM=<this skill's base directory>/scripts/mm.py`. Reflexes belong to the **project** they were learned in (its git root) and only match there. Add `--global` to `log`/`save` for tasks that aren't tied to one project.
 
 ## Flow
 
@@ -22,7 +22,10 @@ Repeated tasks shouldn't be re-reasoned from scratch. Track how often a task rec
    `python3 $MM log <task-key> "<one-line summary>" --triggers "word,word,word"`
    - The key names the *kind* of task, not this instance: `deploy-worker`, not `deploy-worker-tuesday`. Reuse an existing key when it fits (`python3 $MM list`).
    - Triggers are words a future request would contain.
-3. **Compile (when log prints `COMPILE NOW`):** write the reflex to the scratchpad, then `python3 $MM save <key> <file>`.
+   - Add `--global` only if the task is the same in every project (e.g. "clean up Downloads").
+3. **Compile (when told `COMPILE NOW` or "Compile it into a reflex"):** write the reflex to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log).
+
+The hooks log known tasks for you. You'll only be asked to log a brand-new task (at most once per session) or to compile one.
 
 ## Instinct (zero-token tier)
 After a script reflex succeeds 3 runs in a row **with no args**, it is promoted to **instinct**: the prompt hook runs it directly on a strong match and answers with no model call at all. So when compiling, give every arg a sensible default (cwd, `REPORT.md`, `main`...), because a reflex that always needs args can never become an instinct. A failed instinct is demoted automatically. Users can add "no reflex" to a prompt to bypass it, or run `promote`/`demote <key>`.
@@ -34,18 +37,18 @@ After a script reflex succeeds 3 runs in a row **with no args**, it is promoted 
 | Same commands each time, only values differ | `.sh` / `.py` that takes those values as args (`$1`, `--name`), runs `set -euo pipefail`, and prints a short success line |
 | Needs judgment (reading code, choosing names) | `.md` recipe: exact files to open, exact commands, decisions pre-made, ≤15 lines |
 
-A reflex contains: the exact paths, the exact commands, the inputs as parameters, and a check that proves it worked. Bake in what earlier runs learned (gotchas, flags that were needed). Leave out explanations.
+A reflex contains: the exact commands, paths **relative to the project root** (instincts run from there; never absolute paths), the inputs as parameters with defaults, and a check that proves it worked. Bake in what earlier runs learned (gotchas, flags that were needed). Leave out explanations.
 
 ## Quick reference
 | Command | Does |
 |---|---|
 | `match "<text>"` | find a reflex for a task |
 | `run <key> [args]` | execute a reflex, auto-record outcome |
-| `log <key> "<summary>" --triggers "a,b"` | count a manual run |
-| `save <key> <file>` | install / replace reflex |
+| `log <key> "<summary>" --triggers "a,b" [--global]` | count a manual run |
+| `save <key> <file> [--global]` | install / replace reflex |
 | `hit` / `fail <key>` | record outcome (2 fails in a row disables it) |
 | `promote` / `demote <key>` | turn instinct on / off by hand |
-| `list`, `show <key>`, `forget <key>` | inspect / remove |
+| `list [--all]`, `show <key>`, `forget <key>` | inspect / remove |
 
 ## Common mistakes
 - Using a different key every time, so nothing reaches the threshold. Run `list` and reuse keys.
