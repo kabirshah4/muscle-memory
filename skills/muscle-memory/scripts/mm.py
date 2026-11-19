@@ -452,8 +452,8 @@ def bump(scope, key, field, with_args=None, quiet=False, args=None):
                     e["streak"] = e.get("streak", 0) + 1
                     if tpl not in e.get("templates", []):
                         e["templates"] = (e.get("templates", []) + [tpl])[-MAX_PHRASINGS:]
-                else:
-                    e["streak"] = 0
+                # else: args that aren't words of the prompt (e.g. defaults passed explicitly) don't count,
+                # but they don't undo earlier clean runs either
             if mark_eligible(e):
                 out(f"{key} is now ELIGIBLE to become an instinct. It is NOT promoted. Tell the user they can "
                     f"review and approve it in their own terminal with: python3 {SELF} promote {key}")
@@ -771,7 +771,8 @@ def prompt_hook(data):
             idx[k]["near_misses"] = idx[k].get("near_misses", 0) + 1
     hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match. If that is the task, run "
             f"`python3 {SELF} run {k} [args]` as your first step"
-            + (" (it's a script: different names or values just become its args)" if is_script(e) else "")
+            + (" (it's a script: pass args only for values the user actually named, exactly as they wrote them; "
+               "otherwise run it with no args so its defaults apply)" if is_script(e) else "")
             + "; answer briefly from its output. If it fails, do the task normally."
             + (f" This script's output hasn't been checked yet: once, compare what it produced with exactly "
                f"what the user asked (exit 0 isn't enough). If it matches, run `python3 {SELF} verify {k}`; "
@@ -835,13 +836,15 @@ def stop_hook(data):
             if e.get("count", 0) < THRESHOLD:
                 e["count"] = e.get("count", 0) + 1
             e["last_used"] = time.strftime("%Y-%m-%d")
-            ask = e["count"] >= THRESHOLD and not e.get("compile_asked")
+            asked = int(e.get("compile_asked") or 0)  # older stores saved True
+            ask = e["count"] >= THRESHOLD and asked < 3  # re-ask if the last save didn't land
             if ask:
-                e["compile_asked"] = True
+                e["compile_asked"] = asked + 1
         if ask:
             block(f"'{k}' ({idx[k].get('summary', '')}) has now been done {THRESHOLD} times by hand. Compile it into a reflex now, as the "
                   f"muscle-memory skill describes (give every argument a default), then `python3 {SELF} save "
-                  + ("--global " if scope == GLOBAL else "") + f"{k} <file> --summary \"<what it does, in general terms, without this run's specific names>\"`.")
+                  + ("--global " if scope == GLOBAL else "") + f"{k} <file> --summary \"<what it does, in general terms, without this run's specific names>\"`"
+                  + (" and check that it printed 'saved reflex'. The last attempt didn't save one." if asked else "."))
         return
     if not ASK_NEW:
         auto_log(project, prompt)

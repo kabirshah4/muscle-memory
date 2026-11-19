@@ -183,6 +183,8 @@ def run_task(name, model, root, raw_dir):
 
     def record(run, phase, prompt, plugin, st, cwd):
         reset(cwd)
+        if task.get("reset"):
+            task["reset"](cwd, git)
         state = " / ".join(l.strip() for l in mm(st, cwd, "list").splitlines() if not l.startswith("["))[:200]
         r = claude(cwd, prompt, st, plugin, model, os.path.join(raw_dir, name, f"run{run}-{phase}.json"))
         r.update(task=name, run=run, phase=phase, ok=task["check"](cwd, run), state_before=state)

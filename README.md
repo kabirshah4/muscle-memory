@@ -160,7 +160,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 63 end-to-end tests
+python3 -m unittest discover -v tests   # 64 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

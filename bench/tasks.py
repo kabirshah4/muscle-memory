@@ -110,6 +110,42 @@ def check_scaffold(d, run):
     return r.returncode == 0
 
 
+# ---------- 5. release: version bump + changelog + tag (a realistic multi-step task) ----------
+
+def setup_release(d, git):
+    _write(f"{d}/package.json", json.dumps({"name": "acme-cli", "version": "1.4.2", "type": "module"}, indent=2) + "\n")
+    _write(f"{d}/CHANGELOG.md", "# Changelog\n\n## 1.4.2\n\n- Fix: config path on Windows\n")
+    _write(f"{d}/src/index.js", "export const run = () => 0;\n")
+    _commit(d, git, "chore: release 1.4.2")
+    git(d, "tag", "v1.4.2")
+    for msg in ("feat: dark mode for the TUI", "fix: request timeout not respected", "docs: install guide",
+                "fix(auth): refresh expired tokens"):
+        _write(f"{d}/src/index.js", open(f"{d}/src/index.js").read() + f"// {msg}\n")
+        _commit(d, git, msg)
+    git(d, "update-ref", "refs/bench/base", "HEAD")  # a hidden ref, not a tag, so it isn't "the last release"
+
+
+def reset_release(d, git):
+    """Releases create commits and tags, so rewind both between runs."""
+    git(d, "reset", "-q", "--hard", "refs/bench/base")
+    tags = subprocess.run(["git", "-C", d, "tag"], capture_output=True, text=True).stdout.split()
+    for t in tags:
+        if t != "v1.4.2":
+            git(d, "tag", "-d", t)
+
+
+def check_release(d, run):
+    try:
+        version = json.load(open(os.path.join(d, "package.json"))).get("version")
+        cl = open(os.path.join(d, "CHANGELOG.md")).read()
+    except (OSError, ValueError):
+        return False
+    tags = subprocess.run(["git", "-C", d, "tag"], capture_output=True, text=True).stdout.split()
+    low = cl.lower()
+    return (version == "1.5.0" and "v1.5.0" in tags and "1.5.0" in cl and "dark mode" in low
+            and "timeout" in low and "expired tokens" in low and cl.count("## 1.4.2") == 1)
+
+
 TASKS = {
     "report": dict(
         setup=setup_report, check=check_report,
@@ -158,5 +194,18 @@ TASKS = {
             f"unittest in tests/test_{NAMES[2]}.py.",
         ],
         repeat_prompt=lambda run: f"scaffold a {NAMES[run - 1]} module with a test",
+    ),
+    "release": dict(
+        setup=setup_release, check=check_release, reset=reset_release,
+        hand_prompts=[
+            "Cut the next release: work out the semver bump from the conventional commits since the last tag, "
+            "update package.json's version, add a section at the top of CHANGELOG.md listing those commits, "
+            "commit it as 'chore: release X.Y.Z' and create the git tag vX.Y.Z.",
+            "Release a new version of this package. Bump the version in package.json based on the commits since "
+            "the last tag (feat = minor, fix = patch), prepend the changes to CHANGELOG.md, commit, and tag it.",
+            "Do a release: semver bump from commit types since the latest tag, CHANGELOG.md entry, package.json "
+            "version, release commit and a vX.Y.Z tag.",
+        ],
+        repeat_prompt=lambda run: "cut the next release",
     ),
 }

@@ -113,7 +113,7 @@ class Learning(Base):
         script = self.make_reflex()
         self.mm("save", "deploy-worker", script, "--summary", "deploy a worker to an environment")
         self.assertIn("deploy a worker to an environment", self.mm("list"))
-        self.assertIn("different names or values", self.hook("deploy the worker"))
+        self.assertIn("pass args only for values the user actually named", self.hook("deploy the worker"))
 
     def test_save_with_missing_source_keeps_existing_reflex(self):
         self.make_reflex()
@@ -362,13 +362,15 @@ class Templates(Base):
                   "deploy the worker to prod?"):
             self.assertNotIn('"decision": "block"', self.hook(p), p)
 
-    def test_arg_not_in_prompt_resets_streak(self):
+    def test_arg_not_in_prompt_does_not_count(self):
         self.make_reflex()
+        self.mm("verify", "deploy-worker")
         self.hook("deploy the worker to staging")
         self.mm("run", "deploy-worker", "staging")
         self.hook("deploy the worker to staging")
         self.mm("run", "deploy-worker", "something-else")
         self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("instinct-in=1", self.mm("list"))
 
 
 class Launcher(Base):
@@ -525,8 +527,15 @@ class StopHook(Base):
         self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
         out = json.loads(self.stop("set up the database fixtures", 5))            # -> 2: compile
         self.assertIn("Compile it into a reflex", out["reason"])
-        self.assertEqual(self.stop("set up the database fixtures", 5).strip(), "")  # not asked again
+        self.assertIn("didn't save one", self.stop("set up the database fixtures", 5))  # asked again: no reflex yet
         self.assertIn("seen=2 ", self.mm("list"))
+
+    def test_compile_is_asked_again_if_save_did_not_land(self):
+        self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
+        self.assertIn("Compile it", self.stop("set up the database fixtures", 5))
+        self.assertIn("didn't save one", self.stop("set up the database fixtures", 5, sid="s2"))
+        self.stop("set up the database fixtures", 5, sid="s3")
+        self.assertEqual(self.stop("set up the database fixtures", 5, sid="s4").strip(), "")  # max 3 asks
 
     def test_long_detailed_prompt_for_known_task_is_counted(self):
         self.mm("log", "csv-summary", "summarize every csv in data into data/summary.json",

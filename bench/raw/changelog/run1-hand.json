@@ -4,31 +4,27 @@
  "events": [
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git describe --tags --abbrev=0 2>&1; echo \\\"---\\\"; git tag --list; echo \\\"---\\\"; head -40 CHANGELOG.md 2>&1\", \"description\": \"Find last tag and view changelog head\"}"
-  },
-  {
-   "tool": "Bash",
-   "input": "{\"command\": \"git log v0.1.0..HEAD --format='%h %s' ; echo \\\"---\\\"; git log v0.1.0..HEAD --stat --format='== %h' | head -80\", \"description\": \"List commits since last tag\"}"
+   "input": "{\"command\": \"echo \\\"TAGS:\\\" && git tag --sort=-creatordate | head -5 && echo \\\"LOG:\\\" && git log --oneline $(git describe --tags --abbrev=0 2>/dev/null)..HEAD 2>/dev/null; echo \\\"---\\\"; ls; echo \\\"---\\\"; head -40 CHANGELOG.md 2>/dev/null\", \"description\": \"Find last tag, list commits since, view changelog\"}"
   },
   {
    "tool": "Edit",
-   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-8d76sfck/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command (ae69d66)\\n- Pagination support in API (c826231)\\n\\n### Fixes\\n\\n- Crash on empty input (8a24c25)\\n- Exit code on error in CLI (e32ad65)\\"
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-4ig00wp4/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command\\n- API: pagination support\\n\\n### Fixes\\n\\n- Fix crash on empty input\\n- CLI: exit with a non-zero code on error\\n\\n### Documentation\\n\\n"
   },
   {
-   "text": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`, covering the five non-chore commits since that tag. I haven't committed it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command (ae69d66)\n- Pagination support in API (c826231)\n\n### Fixes\n\n- Crash on empty input (8a24c25)\n- Exit code on error in CLI (e32ad65)\n\n### Documentation\n\n- Usage examples (31f8631)\n```\n\n"
+   "text": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`. It covers the six commits since the `v0.1.0` tag:\n\n- **Features**\n  - Add export command (`3c65dd3`)\n  - API: pagination support (`e4f5832`)\n- **Fixes**\n  - Fix crash on empty input (`709127b`)\n  - CLI: exit with a non-zero code on error (`d51c85f`)\n- **Documentation**\n  - Add usage examples (`ed68ab5`)\n\nI skipped `d5462"
   },
   {
    "subtype": "success",
-   "total_cost_usd": 0.006518330000000001,
-   "num_turns": 4,
-   "duration_ms": 7324,
+   "total_cost_usd": 0.00632584,
+   "num_turns": 3,
+   "duration_ms": 7058,
    "usage": {
-    "input_tokens": 8,
-    "cache_creation_input_tokens": 24288,
-    "cache_read_input_tokens": 114093,
-    "output_tokens": 1038,
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 24777,
+    "cache_read_input_tokens": 78534,
+    "output_tokens": 1169,
     "output_tokens_details": {
-     "thinking_tokens": 151
+     "thinking_tokens": 404
     },
     "server_tool_use": {
      "web_search_requests": 0,
@@ -36,19 +32,19 @@
     },
     "service_tier": "standard",
     "cache_creation": {
-     "ephemeral_1h_input_tokens": 24288,
+     "ephemeral_1h_input_tokens": 24777,
      "ephemeral_5m_input_tokens": 0
     },
     "inference_geo": "global",
     "iterations": [
      {
       "input_tokens": 2,
-      "output_tokens": 230,
-      "cache_read_input_tokens": 34793,
-      "cache_creation_input_tokens": 506,
+      "output_tokens": 251,
+      "cache_read_input_tokens": 35076,
+      "cache_creation_input_tokens": 712,
       "cache_creation": {
        "ephemeral_5m_input_tokens": 0,
-       "ephemeral_1h_input_tokens": 506
+       "ephemeral_1h_input_tokens": 712
       },
       "type": "message"
      }
@@ -56,7 +52,7 @@
     "speed": "standard",
     "fallback_credit": null
    },
-   "result": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`, covering the five non-chore commits since that tag. I haven't committed it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command (ae69d66)\n- Pagination support in API (c826231)\n\n### Fixes\n\n- Crash on empty input (8a24c25)\n- Exit code on error in CLI (e32ad65)\n\n### Documentation\n\n- Usage examples (31f8631)\n```\n\nI left out `3691c68 chore: bump deps` as you asked. I used the commit subjects with the type prefix removed and added short hashes for traceability; say if you'd rather have no hashes."
+   "result": "I added an `Unreleased` section to the top of `CHANGELOG.md`, above `v0.1.0`. It covers the six commits since the `v0.1.0` tag:\n\n- **Features**\n  - Add export command (`3c65dd3`)\n  - API: pagination support (`e4f5832`)\n- **Fixes**\n  - Fix crash on empty input (`709127b`)\n  - CLI: exit with a non-zero code on error (`d51c85f`)\n- **Documentation**\n  - Add usage examples (`ed68ab5`)\n\nI skipped `d5462e5 chore: bump deps`, as you asked. I wrote the entries as plain bullets without commit hashes to match the existing `v0.1.0` entry. I haven't committed the change."
   }
  ]
 }
