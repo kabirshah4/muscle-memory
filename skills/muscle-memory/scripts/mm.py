@@ -14,7 +14,8 @@ Commands:
   save <key> <file> [--global]              install a reflex (.sh, .py or .md)
   run <key> [args...]                       execute a reflex, auto-record hit/fail
   hit <key> | fail <key>                    record a reflex outcome by hand
-  promote <key> | demote <key>              turn instinct (hook runs it, no model) on / off
+  promote <key> [--confirm <hash>]          review, then approve, an instinct (hook runs it, no model)
+  demote <key>                              turn an instinct off
   list [--all]                              tasks here + global (--all: every project)
   show <key> | forget <key>                 print / delete a reflex
   hook | stop-hook                          Claude Code hook entry points (read JSON on stdin)
@@ -40,7 +41,8 @@ INSTINCT_AFTER = int(os.environ.get("MUSCLE_MEMORY_INSTINCT_AFTER", "3"))
 MIN_CALLS = int(os.environ.get("MUSCLE_MEMORY_MIN_CALLS", "3"))
 ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "1") != "0"
 MATCH_SCORE = 0.5
-INSTINCT_SCORE = 0.75
+INSTINCT_SCORE = 0.75   # plus: >= 2 shared words and a short prompt (see strong_match)
+INSTINCT_MAX_WORDS = 12
 BYPASS = "no reflex"
 SELF = os.path.abspath(__file__)
 GLOBAL = "global"
@@ -169,6 +171,18 @@ def find(project, text, need_reflex=True):
     return best
 
 
+def strong_match(text, entry, key):
+    """Stricter test for running with no model: high score, >= 2 shared words, short prompt."""
+    t = toks(text)
+    vocab = toks(" ".join(entry.get("triggers", [])) + " " + key.replace("-", " ") + " " + entry.get("summary", ""))
+    return score(t, entry, key) >= INSTINCT_SCORE and len(t & vocab) >= 2 and len(t) <= INSTINCT_MAX_WORDS
+
+
+def file_hash(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
 def resolve(project, key):
     k = slug(key)
     for scope in (project, GLOBAL):
@@ -219,7 +233,7 @@ def cmd_save(scope, key, path):
         if ext != ".md":
             os.chmod(dest, 0o755)
         e = idx.setdefault(key, new_entry())
-        e.update(reflex=key + ext, fails=0, streak=0, instinct=False)
+        e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False, approved_sha=None)
     print(f"saved reflex {dest}")
 
 
@@ -236,11 +250,12 @@ def bump(scope, key, field, with_args=None, quiet=False):
                 e["streak"] = e.get("streak", 0) + 1
             elif with_args:
                 e["streak"] = 0
-            if e.get("streak", 0) >= INSTINCT_AFTER and not e.get("instinct"):
-                e["instinct"] = True
-                out(f"{key} promoted to INSTINCT: the prompt hook will now run it directly, with no model call")
+            if e.get("streak", 0) >= INSTINCT_AFTER and not e.get("instinct") and not e.get("eligible"):
+                e["eligible"] = True
+                out(f"{key} is now ELIGIBLE to become an instinct (runs with no model call). It is NOT promoted. "
+                    f"Tell the user they can review and approve it with: mm promote {key}")
         else:
-            e["streak"], e["instinct"] = 0, False
+            e["streak"], e["instinct"], e["eligible"] = 0, False, False
             if e["fails"] >= 2 and e.get("reflex"):
                 out(f"{key} failed twice in a row - reflex disabled, fix and re-save it")
                 p = reflex_path(scope, e)
@@ -287,6 +302,8 @@ def cmd_list(project, all_projects):
         for k, e in sorted(idx.items(), key=lambda kv: -kv[1]["count"]):
             if e.get("instinct"):
                 status = f"INSTINCT {e['reflex']} uses={e.get('uses', 0)}"
+            elif e.get("eligible"):
+                status = f"reflex {e['reflex']} uses={e.get('uses', 0)} ELIGIBLE (approve: mm promote {k})"
             elif e.get("reflex"):
                 status = (f"reflex {e['reflex']} uses={e.get('uses', 0)} "
                           f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}")
@@ -337,7 +354,12 @@ def cmd_prompt_hook():
         return
     scope, k, e, sc = m
     path = reflex_path(scope, e)
-    if e.get("instinct") and sc >= INSTINCT_SCORE and path.endswith((".sh", ".py")) and os.path.exists(path):
+    approved = (e.get("instinct") and path.endswith((".sh", ".py")) and os.path.exists(path)
+                and e.get("approved_sha") == file_hash(path))
+    if e.get("instinct") and not approved:
+        with edit(scope) as idx:  # changed since approval, or approved before v0.4: needs re-approval
+            idx[k]["instinct"], idx[k]["eligible"] = False, True
+    if approved and strong_match(prompt, e, k):
         try:
             r = subprocess.run(["python3" if path.endswith(".py") else "bash", path],
                                cwd=project if scope != GLOBAL else cwd,
@@ -350,8 +372,9 @@ def cmd_prompt_hook():
         if rc == 0:
             bump(scope, k, "uses", with_args=False, quiet=True)
             print(json.dumps({"decision": "block", "reason":
-                f"⚡ muscle-memory: ran '{k}' by instinct (no model call). "
-                f"Add \"{BYPASS}\" to your prompt to have Claude do it instead.\n\n{output}"}))
+                f"⚡ muscle-memory ran the instinct '{k}' ({path}) with no model call. "
+                f"Add \"{BYPASS}\" to your prompt to have Claude do it instead; `mm demote {k}` turns it off."
+                f"\n\n{output}"}))
             return
         bump(scope, k, "fails", quiet=True)
         print(f"[muscle-memory] The instinct '{k}' just failed (exit {rc}) and was demoted. Output:\n{output}\n"
@@ -359,7 +382,9 @@ def cmd_prompt_hook():
         return
     print(f"[muscle-memory] Reflex '{k}' matches this task ({e.get('summary', '')}). "
           f"Run it instead of re-deriving the steps: `python3 {SELF} run {k} [args]` (it executes the reflex and "
-          f"records the outcome; no need to read the script first). Only if it fails, fall back to doing the task normally.")
+          f"records the outcome; no need to read the script first). Only if it fails, fall back to doing the task normally."
+          + (f" This reflex is eligible to become an instinct: after the task, tell the user they can review and "
+             f"approve it with `mm promote {k}`. Never promote it yourself." if e.get("eligible") else ""))
 
 
 def block(reason):
@@ -454,13 +479,32 @@ def main(argv):
     elif c in ("hit", "fail"):
         s, k, _ = resolve(project, a[0])
         bump(s, k, "uses" if c == "hit" else "fails")
-    elif c in ("promote", "demote"):
+    elif c == "promote":
         s, k, e = resolve(project, a[0])
-        if c == "promote" and not (e.get("reflex") or "").endswith((".sh", ".py")):
+        if not (e.get("reflex") or "").endswith((".sh", ".py")):
             sys.exit("only script reflexes (.sh/.py) can become instincts")
+        path = reflex_path(s, e)
+        h = file_hash(path)
+        if "--confirm" not in a:
+            with open(path) as f:
+                body = f.read()
+            print(f"Instinct review: '{k}' ({'global' if s == GLOBAL else s})\n"
+                  f"Runs with NO model call when a short prompt strongly matches: {', '.join(e.get('triggers', []))}\n"
+                  f"Working directory: {'your current directory' if s == GLOBAL else s}\n"
+                  f"Script {path}:\n{'-' * 60}\n{body.rstrip()}\n{'-' * 60}\n"
+                  f"If this is safe to run unattended, approve it with:\n  mm promote {k} --confirm {h[:12]}")
+            return
+        given = a[a.index("--confirm") + 1] if a.index("--confirm") + 1 < len(a) else ""
+        if not given or not h.startswith(given) or len(given) < 8:
+            sys.exit("hash does not match the current script; run `mm promote " + k + "` again to review it")
         with edit(s) as idx:
-            idx[k]["instinct"] = c == "promote"
-        print(f"{k}: instinct={'on' if c == 'promote' else 'off'}")
+            idx[k].update(instinct=True, eligible=False, approved_sha=h)
+        print(f"{k}: instinct ON (approved script {h[:12]}). Editing the script revokes approval.")
+    elif c == "demote":
+        s, k, e = resolve(project, a[0])
+        with edit(s) as idx:
+            idx[k]["instinct"] = False
+        print(f"{k}: instinct off")
     elif c == "list":
         cmd_list(project, "--all" in a)
     elif c == "show":

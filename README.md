@@ -8,7 +8,7 @@ A Claude Code plugin that turns your repeated tasks into reflexes,<br>
 and your proven reflexes into instincts that run with **zero tokens**.
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
-![version](https://img.shields.io/badge/version-0.3.0-2a78d6)
+![version](https://img.shields.io/badge/version-0.4.0-2a78d6)
 ![status](https://img.shields.io/badge/status-experimental-eda100)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
@@ -33,7 +33,7 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 | **Who does it** | Claude, from scratch | Claude runs a saved script | The hook runs it before Claude is called |
 | **Tool calls** | 2–7 | 1–3 | **0** |
 | **Cost (example)** | $0.10–0.27 | $0.03–0.19 | **$0.00** |
-| **Unlocks after** | — | 3 repeats | 3 clean reflex runs |
+| **Unlocks after** | — | 3 repeats (automatic) | 3 clean runs + **your approval** |
 
 > [!NOTE]
 > **Status: experimental (v0.3).** It works end to end, but it has only been tested on a small number of tasks. Issues and feedback welcome.
@@ -61,7 +61,7 @@ flowchart LR
     C --> D[Stop hook counts it]
     D -- 3rd time --> E[Claude compiles a reflex<br>script or recipe]
     B -- yes, reflex --> F[Claude runs it<br>1–3 tool calls]
-    F -- 3 clean runs --> G[Promoted to instinct]
+    F -- 3 clean runs --> G[Eligible: you review<br>and approve the script]
     B -- yes, instinct --> H[Hook runs it<br>⚡ 0 tokens]
     H -. fails .-> I[Demoted:<br>Claude takes over]
 ```
@@ -70,9 +70,9 @@ flowchart LR
 |---|---|---|
 | **Discover** | A `Stop` hook counts the tool calls in each turn. After a 3+ call turn on a task it doesn't know, it asks Claude whether the task could recur. It asks **at most once per session.** | one short turn, max once per session |
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
-| **Compile** | On the 3rd run, Claude writes a reflex: a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
+| **Compile** | On the 3rd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
-| **Instinct** | After 3 successful runs in a row with no args, a script reflex is promoted. On a strong match, the prompt hook runs it, shows you the output and **never calls the model**. | **zero** |
+| **Instinct** | After 3 successful runs in a row with no args, a script reflex becomes **eligible**. **Only you can promote it**: `mm promote <key>` shows the exact script, and `--confirm <hash>` approves it. From then on, a short, strongly matching prompt runs it with **no model call**. Editing the script revokes approval. | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
 
 ### Scoping
@@ -129,7 +129,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | `mm list` | tasks in this project + global (`--all` for every project) |
 | `mm show <key>` | print a reflex |
 | `mm run <key> [args]` | execute a reflex and record success/failure |
-| `mm promote <key>` | let it run without Claude now |
+| `mm promote <key>` | review the script, then approve it with `--confirm <hash>` |
 | `mm demote <key>` | stop it running without Claude |
 | `mm forget <key>` | delete it |
 
@@ -151,7 +151,8 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 Reflexes are scripts that Claude writes and runs on your machine. They stay local and are never uploaded. Because instincts run with no model in the loop, they need:
 
 - ✅ 3 clean runs as a reflex first
-- ✅ a strong keyword match (score ≥ 0.75)
+- ✅ **your explicit approval** after seeing the script (`mm promote <key>`), pinned to its hash
+- ✅ a strong match: score ≥ 0.75, at least 2 shared words, and a short prompt (≤ 12 words)
 - ✅ the right project (or an explicit `--global`)
 
 They're demoted on the first failure. Review yours with `mm list` and `mm show` now and then.
@@ -168,7 +169,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 14 end-to-end tests
+python3 -m unittest discover -v tests   # 17 end-to-end tests
 python3 docs/make_charts.py             # regenerate README charts
 ```
 

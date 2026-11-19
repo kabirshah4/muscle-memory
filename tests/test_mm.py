@@ -42,6 +42,11 @@ class MMTest(unittest.TestCase):
             f.write("#!/usr/bin/env bash\n" + body + "\n")
         self.mm("save", key, script, *g, cwd=cwd)
 
+    def approve(self, key="deploy-worker", cwd=None):
+        review = self.mm("promote", key, cwd=cwd)
+        h = review.strip().split("--confirm ")[-1].split()[0]
+        return review, self.mm("promote", key, "--confirm", h, cwd=cwd)
+
     def hook(self, prompt, cwd):
         return self.mm("hook", cwd=cwd, stdin=json.dumps({"prompt": prompt, "cwd": cwd}))
 
@@ -72,17 +77,41 @@ class MMTest(unittest.TestCase):
 
     # --- instinct ---
 
-    def test_promotion_requires_clean_noarg_runs(self):
+    def test_clean_runs_make_eligible_never_promote(self):
         self.make_reflex(self.a)
         self.mm("run", "deploy-worker", "some-arg")  # args don't count toward instinct
         for _ in range(2):
             self.mm("run", "deploy-worker")
+        self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("ELIGIBLE", self.mm("run", "deploy-worker"))
         self.assertNotIn("INSTINCT", self.mm("list"))
-        self.assertIn("promoted to INSTINCT", self.mm("run", "deploy-worker"))
+        self.assertIn("approve it with `mm promote deploy-worker`", self.hook("deploy the worker", self.a))
+
+    def test_promote_shows_script_and_needs_matching_hash(self):
+        self.make_reflex(self.a)
+        review = self.mm("promote", "deploy-worker")
+        self.assertIn('echo "ran in $(pwd)"', review)
+        self.assertNotIn("INSTINCT", self.mm("list"))
+        self.assertIn("does not match", self.mm("promote", "deploy-worker", "--confirm", "deadbeefdead"))
+        _, ok = self.approve()
+        self.assertIn("instinct ON", ok)
+
+    def test_editing_script_revokes_approval(self):
+        self.make_reflex(self.a)
+        self.approve()
+        path = os.path.join(self.root, "store")
+        for dirpath, _, files in os.walk(path):
+            for f in files:
+                if f == "deploy-worker.sh":
+                    with open(os.path.join(dirpath, f), "a") as fh:
+                        fh.write("rm -rf /tmp/whatever\n")
+        out = self.hook("deploy the worker", self.a)
+        self.assertNotIn('"block"', out)
+        self.assertIn("ELIGIBLE", self.mm("list"))
 
     def test_instinct_runs_in_project_root_without_model(self):
         self.make_reflex(self.a)
-        self.mm("promote", "deploy-worker")
+        self.approve()
         sub = os.path.join(self.a, "sub")
         os.makedirs(sub)
         out = json.loads(self.hook("deploy the worker", sub))
@@ -91,13 +120,21 @@ class MMTest(unittest.TestCase):
 
     def test_bypass_and_weak_match(self):
         self.make_reflex(self.a)
-        self.mm("promote", "deploy-worker")
+        self.approve()
         self.assertEqual(self.hook("deploy the worker, no reflex", self.a).strip(), "")
         self.assertNotIn("block", self.hook("worker bees in the garden are buzzing loudly today", self.a))
 
+    def test_long_prompt_never_runs_instinct(self):
+        self.make_reflex(self.a)
+        self.approve()
+        long = "deploy the worker but first explain why the staging config differs from prod and fix the env vars"
+        out = self.hook(long, self.a)
+        self.assertNotIn('"block"', out)
+        self.assertIn("Reflex 'deploy-worker' matches", out)
+
     def test_failed_instinct_is_demoted(self):
         self.make_reflex(self.a, body="exit 3")
-        self.mm("promote", "deploy-worker")
+        self.approve()
         out = self.hook("deploy the worker", self.a)
         self.assertIn("failed (exit 3) and was demoted", out)
         self.assertNotIn("INSTINCT", self.mm("list"))

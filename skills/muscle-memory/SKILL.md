@@ -23,12 +23,15 @@ Repeated tasks shouldn't be re-reasoned from scratch. Track how often a task rec
    - The key names the *kind* of task, not this instance: `deploy-worker`, not `deploy-worker-tuesday`. Reuse an existing key when it fits (`python3 $MM list`).
    - Triggers are words a future request would contain.
    - Add `--global` only if the task is the same in every project (e.g. "clean up Downloads").
-3. **Compile (when told `COMPILE NOW` or "Compile it into a reflex"):** write the reflex to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log).
+3. **Compile automatically on the 3rd run.** When `log` prints `COMPILE NOW`, or the Stop hook says "Compile it into a reflex", write the reflex straight away; no user approval needed. Save it to the scratchpad, then `python3 $MM save <key> <file>` (same `--global` choice as the log). Compiling only writes a file. A reflex still runs only when you choose to run it.
 
 The hooks log known tasks for you. You'll only be asked to log a brand-new task (at most once per session) or to compile one.
 
 ## Instinct (zero-token tier)
-After a script reflex succeeds 3 runs in a row **with no args**, it is promoted to **instinct**: the prompt hook runs it directly on a strong match and answers with no model call at all. So when compiling, give every arg a sensible default (cwd, `REPORT.md`, `main`...), because a reflex that always needs args can never become an instinct. A failed instinct is demoted automatically. Users can add "no reflex" to a prompt to bypass it, or run `promote`/`demote <key>`.
+After a script reflex succeeds 3 runs in a row **with no args**, it becomes **eligible** to be an instinct. An instinct is run by the prompt hook directly, with no model call. Eligible is not promoted: **only the user promotes**, by running `mm promote <key>`, which shows them the script, then `mm promote <key> --confirm <hash>`.
+- When `run` prints `ELIGIBLE` or the hook hint says the reflex is eligible, tell the user in one line that they can approve it with `mm promote <key>`. **Never run `promote` yourself.**
+- When compiling, give every arg a sensible default (cwd, `REPORT.md`, `main`...): a reflex that always needs args can never become eligible.
+- Approval is pinned to the script's hash. Re-saving or editing the script revokes it. A failed instinct is demoted automatically.
 
 ## Compiling a good reflex
 
@@ -47,7 +50,7 @@ A reflex contains: the exact commands, paths **relative to the project root** (i
 | `log <key> "<summary>" --triggers "a,b" [--global]` | count a manual run |
 | `save <key> <file> [--global]` | install / replace reflex |
 | `hit` / `fail <key>` | record outcome (2 fails in a row disables it) |
-| `promote` / `demote <key>` | turn instinct on / off by hand |
+| `promote` / `demote <key>` | user-only: review + approve an instinct / turn it off |
 | `list [--all]`, `show <key>`, `forget <key>` | inspect / remove |
 
 ## Common mistakes
