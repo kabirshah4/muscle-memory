@@ -78,7 +78,7 @@ flowchart LR
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
 | **Compile** | On the 2nd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
-| **Instinct** | After 2 clean runs **and** one run where Claude confirmed the output matched the request, a script reflex becomes **eligible**. **Only you can approve it**, in your terminal (`mm promote <key>`). After that, prompts with an approved wording or pattern run it with **no model call**. [Details →](docs/how-it-works.md#instincts) | **zero** |
+| **Instinct** | After 2 clean runs whose result **matches what was done by hand** (same files changed, same content, checked mechanically), a script reflex becomes **eligible**. **Only you can approve it**, in your terminal (`mm promote <key>`). After that, prompts with an approved wording or pattern run it with **no model call**. [Details →](docs/how-it-works.md#instincts) | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
 
 ### Scoping
@@ -141,7 +141,7 @@ Settings: see [environment variables](docs/reference.md#environment-variables).
 
 Reflexes are scripts that Claude writes and runs on your machine. They stay local and are never uploaded. Because instincts run with no model in the loop, they need:
 
-- ✅ 2 clean runs as a reflex first, **and** Claude checked once that the output actually matched the request: a script that runs without errors can still be wrong
+- ✅ 2 clean runs as a reflex first, whose result matched the by-hand runs (same files, same content words), checked mechanically: a script that runs without errors can still be wrong
 - ✅ **your explicit approval** in an interactive terminal after seeing the script (`mm promote <key>`), pinned to its sha256 hash. The hash covers that one file only, not other scripts it calls.
 - ✅ an exact match: the prompt must use the same words, in the same order, as a wording you approved (filler words like "the" are ignored), be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
 - ✅ the right project (or an explicit `--global`)
@@ -160,7 +160,7 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 64 end-to-end tests
+python3 -m unittest discover -v tests   # 65 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 

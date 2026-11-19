@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Output check: a script must have its output confirmed correct once (`mm verify`) before it can become an instinct
+- Output check: a script's result is compared mechanically with the by-hand runs (files, tags, content words) and only matching runs count toward instinct; `mm verify` remains for tasks that change no files
 - Hit rate: `mm list` shows free runs vs near-misses for each instinct
 - Codex: failed or denied tool calls no longer count
 - Instinct details moved to docs/how-it-works.md

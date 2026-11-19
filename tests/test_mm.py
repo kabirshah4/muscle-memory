@@ -399,6 +399,53 @@ class Launcher(Base):
         self.assertNotIn("block", self.hook("mm deploy-worker'unclosed"))  # bad quoting: not launched
 
 
+class OutputCheck(Base):
+    """A script that runs cleanly but produces the wrong result must not count toward instinct."""
+    PROMPT = "write the repo health report to REPORT.md"
+
+    def hand_run(self, content, sid):
+        subprocess.run(["git", "-C", self.a, "commit", "-q", "--allow-empty", "-m", "base"], check=True,
+                       env=dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+                                GIT_COMMITTER_EMAIL="t@t"))
+        self.hook(self.PROMPT)                       # snapshot before the turn
+        with open(os.path.join(self.a, "REPORT.md"), "w") as f:
+            f.write(content)
+        t = os.path.join(self.root, sid + ".jsonl")
+        with open(t, "w") as f:
+            f.write(json.dumps({"type": "user", "message": {"content": self.PROMPT}}) + "\n")
+            for i in range(3):
+                f.write(json.dumps({"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": f"{sid}{i}", "name": "Bash", "input": {"command": "x"}}]}}) + "\n")
+        out = self.mm("stop-hook", stdin=json.dumps({"transcript_path": t, "cwd": self.a, "session_id": sid}))
+        os.remove(os.path.join(self.a, "REPORT.md"))
+        return out
+
+    def save(self, body):
+        script = os.path.join(self.root, "r.sh")
+        with open(script, "w") as f:
+            f.write("#!/usr/bin/env bash\n" + body + "\n")
+        key = [l.split()[0] for l in self.mm("list").splitlines() if "seen=" in l][0]
+        self.mm("save", key, script)
+        return key
+
+    def test_wrong_output_is_caught_and_right_output_counts(self):
+        self.hand_run("Languages: Python 401 lines, TypeScript 180 lines. Largest: src/mod4.py\n", "h1")
+        self.assertIn("Compile it", self.hand_run("Python: 401, TypeScript: 180. Biggest file src/mod4.py\n", "h2"))
+        key = self.save("printf '.py 401\\n.ts 180\\nsrc/mod4.py\\n' > REPORT.md")
+        self.hook(self.PROMPT)
+        out = self.mm("run", key)
+        self.assertIn("DOESN'T match", out)
+        self.assertIn("'python'", out)
+        self.assertIn("instinct-in=2", self.mm("list"))
+        self.assertIn("checked automatically", self.mm("verify", key))  # Claude can't override it
+        key = self.save("printf 'Python 401\\nTypeScript 180\\nsrc/mod4.py\\n' > REPORT.md")
+        self.hook(self.PROMPT)
+        self.assertIn("matches the by-hand runs", self.mm("run", key))
+        os.remove(os.path.join(self.a, "REPORT.md"))
+        self.hook(self.PROMPT)
+        self.assertIn("ELIGIBLE", self.mm("run", key))
+
+
 class OtherCLIs(Base):
     def cli_hook(self, cli, payload):
         return self.mm("hook", "--cli", cli, stdin=json.dumps(payload))
