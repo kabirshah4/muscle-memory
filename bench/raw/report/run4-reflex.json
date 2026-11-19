@@ -4,58 +4,63 @@
  "events": [
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git status --short && git log --oneline | head -20 && ls -la && cat REPORT.md 2>/dev/null; echo ---; cat README.md 2>/dev/null\", \"description\": \"Inspect repo state, log, and existing report\"}"
+   "input": "{\"command\": \"pwd && git status --short && git log --oneline | head -20 && ls -la && echo \\\"---\\\" && cat REPORT.md 2>/dev/null; echo \\\"---\\\"; find . -path ./.git -prune -o -type f -print | head -200\", \"description\": \"Inspect repo state, log, and existing report\"}"
+  },
+  {
+   "text": "No `REPORT.md` exists yet, so I'll build it from scratch. The repo is small, so I'll read the source directly."
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"find . -path ./.git -prune -o -type f -print | xargs wc -l && for f in $(find src web -type f); do echo \\\"== $f\\\"; cat \\\"$f\\\"; done; git show --stat HEAD~2 HEAD~1 HEAD | head -60\", \"description\": \"List files, read sources, and show commit stats\"}"
+   "input": "{\"command\": \"for f in README.md src/*.py web/*.ts; do echo \\\"=== $f ($(wc -l < $f) lines)\\\"; cat \\\"$f\\\"; echo; done; echo \\\"=== git\\\"; git log --stat --format='%h %an <%ae> %ad %s' | head -60; git branch -a; git tag; git remote -v; git status\", \"description\": \"Read all source files, README, and git history\"}"
+  },
+  {
+   "text": "The repo has no existing report and no tests or tooling. I'll run a few quick checks (syntax, function counts, duplicate definitions) without writing into the repo."
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"echo \\\"commits: $(git rev-list --count HEAD)\\\"; echo \\\"authors: $(git log --format=%an | sort -u | tr '\\\\n' ' ')\\\"; echo \\\"first: $(git log --reverse --format=%ad --date=short | head -1)  last: $(git log -1 --format=%ad --date=short)\\\"; echo \\\"branches: $(git branch --format='%(refname:short)' | tr '\\\\n' ' ')\\\"; echo \\\"remotes: $(git remote -v | wc -l)\\\"; echo \\\"tracked: $(git ls-file"
-  },
-  {
-   "tool": "Bash",
-   "input": "{\"command\": \"git status --short && rm -rf src/__pycache__ && git status --short && echo clean\", \"description\": \"Check for artifacts from compile check and remove them\"}"
+   "input": "{\"command\": \"python3 -I - <<'EOF'\\nimport ast, glob, collections\\nfor f in sorted(glob.glob(\\\"src/*.py\\\")):\\n    src = open(f).read()\\n    t = ast.parse(src)  # syntax check, no bytecode written\\n    fns = [n.name for n in t.body if isinstance(n, ast.FunctionDef)]\\n    print(f, \\\"syntax OK\\\", \\\"functions:\\\", len(fns), \\\"dupes:\\\", [k for k,v in collections.Counter(fns).items() if v>1], \\\"lines:\\\", "
   },
   {
    "tool": "Write",
-   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-v1mt7igv/report/REPORT.md\", \"content\": \"# Repo Health Report\\n\\nGenerated 2026-11-19 from the `main` branch (HEAD `92419d4`).\\n\\n## Summary\\n\\n| Area | Status |\\n|------|--------|\\n| Working tree | Clean, no untracked or modified files |\\n| Git history | 3 commits, single author (`bench`) |\\n| Branches | `main` only |"
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-_2g3sx9i/report/REPORT.md\", \"content\": \"# Repo Health Report\\n\\nGenerated 2026-11-19 from branch `main` at commit `8573d71` (working tree clean).\\n\\n## Summary\\n\\n| Area | Status | Notes |\\n|------|--------|-------|\\n| Syntax | Pass | All 4 Python modules parse cleanly (`ast.parse`). |\\n| Duplicate definitions | Pass "
   },
   {
-   "text": "I wrote a new `REPORT.md` at the repo root. No report existed before, so this created it rather than regenerating one. I did not commit it.\n\nThe report covers:\n- **Working tree and history:** clean, 3 commits, one author, `main` only, no remote.\n- **Code inventory:** line and definition counts per file. Python totals 401 lines and 200 functions; TypeScript totals 180 lines and 180 exports.\n- **Che"
+   "text": "I wrote `REPORT.md` at the repo root. No report existed before, so this is a new file rather than a regeneration. I did not commit it.\n\nThe repo is small, with 7 tracked files and 581 lines of code, and it is mostly generated boilerplate: one-line `return N` functions in Python and `export const vN = N;` in TypeScript.\n\nThe main findings:\n- **Passing:** all four Python modules parse, and there are"
   },
   {
    "tool": "Skill",
-   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"Compile the write-report-md-project reflex (REPORT.md repo health report) with every argument defaulted\"}"
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"Compile write-report-md-project reflex\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/tmp/mm-reflex/write-report-md-project.sh\", \"content\": \"#!/usr/bin/env bash\\n# Write a REPORT.md health report for the current git repo.\\n# Usage: write-report-md-project.sh [output_file=REPORT.md] [top_n=3]\\n# Run from the project root. Paths in the report are relative.\\nset -euo pipefail\\n\\nOUT=\\\"${1:-REPORT.md}\\\"\\nTOP=\\\"${2:-3}\\\"\\n\\nif ! git rev-parse --is-inside-work-tree >/dev/"
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/write-report-md-project.sh <<'EOF'\\n#!/usr/bin/env bash\\n# Write a REPORT.md project health report for the current git repo.\\n# Args (all optional): $1 output file (default REPORT.md), $2 number of largest files (default 3)\\nset -euo pipefail\\nout=\\\"${1:-REPORT.md}\\\"\\ntop=\\\"${2:-3}\\\"\\nroot=\\\"$(git rev-parse --show-toplevel)\\\"\\ncd \\\"$ro"
+   "input": "{\"command\": \"mkdir -p /tmp/mm-reflex && cat > /tmp/mm-reflex/write-report-md-project.sh <<'EOF'\\n#!/usr/bin/env bash\\n# Write a REPORT.md health report for the current git repo.\\n# Usage: write-report-md-project.sh [output_file=REPORT.md] [top_n=3]\\n# Run from the project root. Paths in the report are relative.\\nset -euo pipefail\\n\\nOUT=\\\"${1:-REPORT.md}\\\"\\nTOP=\\\"${2:-3}\\\"\\n\\nif ! git rev-parse --"
+  },
+  {
+   "text": "The script's output matches the by-hand report. Saving it as the reflex now."
   },
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git status --short; ls -la; git status --porcelain --ignored | head\", \"description\": \"Check what makes the working tree dirty\"}"
+   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save write-report-md-project /tmp/mm-reflex/write-report-md-project.sh --summary \\\"Writes a REPORT.md health report for the current git repo: lines of code per language, the largest source files, tooling presence, and git history. Takes an optional output path and top-N count.\\\"\", \"description\": \"Save the w"
   },
   {
-   "tool": "Bash",
-   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save write-report-md-project /tmp/mm-scratch/write-report-md-project.sh --summary \\\"Writes a REPORT.md health report for the current git repo: commit and branch summary, lines of code per language, and the largest source files. Optional args: output file and count of largest files.\\\"\", \"description\": \"Save "
-  },
-  {
-   "text": "The `write-report-md-project` reflex is saved in muscle-memory for this project.\n\n- **Script:** `/tmp/mm-scratch/write-report-md-project.sh`. It runs from the repo root and takes two optional arguments: the output file (default `REPORT.md`) and the number of largest files to list (default `3`).\n- **What it writes:** commit count, last commit, branches, remotes, uncommitted changes, lines of code p"
+   "text": "The `write-report-md-project` reflex is saved for this project. It is a shell script that writes a `REPORT.md` like the one I made by hand. I tested it into a temp file and its output matched.\n\n- **Script:** `/tmp/mm-reflex/write-report-md-project.sh`. Its installed copy is in the muscle-memory store for this project.\n- **Arguments:** `[output_file=REPORT.md] [top_n=3]`. Both have defaults, so a b"
   },
   {
    "subtype": "success",
-   "total_cost_usd": 0.014081860000000002,
-   "num_turns": 12,
-   "duration_ms": 36171,
+   "total_cost_usd": 0.015635529999999998,
+   "num_turns": 11,
+   "duration_ms": 43550,
    "usage": {
-    "input_tokens": 22,
-    "cache_creation_input_tokens": 34438,
-    "cache_read_input_tokens": 428456,
-    "output_tokens": 5815,
+    "input_tokens": 20,
+    "cache_creation_input_tokens": 37010,
+    "cache_read_input_tokens": 394253,
+    "output_tokens": 8578,
     "output_tokens_details": {
-     "thinking_tokens": 1004
+     "thinking_tokens": 1247
     },
     "server_tool_use": {
      "web_search_requests": 0,
@@ -63,19 +68,19 @@
     },
     "service_tier": "standard",
     "cache_creation": {
-     "ephemeral_1h_input_tokens": 34438,
+     "ephemeral_1h_input_tokens": 37010,
      "ephemeral_5m_input_tokens": 0
     },
     "inference_geo": "global",
     "iterations": [
      {
       "input_tokens": 2,
-      "output_tokens": 388,
-      "cache_read_input_tokens": 47672,
-      "cache_creation_input_tokens": 475,
+      "output_tokens": 361,
+      "cache_read_input_tokens": 50318,
+      "cache_creation_input_tokens": 401,
       "cache_creation": {
        "ephemeral_5m_input_tokens": 0,
-       "ephemeral_1h_input_tokens": 475
+       "ephemeral_1h_input_tokens": 401
       },
       "type": "message"
      }
@@ -83,7 +88,7 @@
     "speed": "standard",
     "fallback_credit": null
    },
-   "result": "The `write-report-md-project` reflex is saved in muscle-memory for this project.\n\n- **Script:** `/tmp/mm-scratch/write-report-md-project.sh`. It runs from the repo root and takes two optional arguments: the output file (default `REPORT.md`) and the number of largest files to list (default `3`).\n- **What it writes:** commit count, last commit, branches, remotes, uncommitted changes, lines of code per language by extension, and the top N largest tracked files.\n- **Tested:** I ran it against this repo, writing to a scratch file so `REPORT.md` was not touched. The output was correct.\n- **Saved as:** `write-report-md-project.sh` under the project's reflex store.\n\nTwo things to know:\n- The exact wording of the original hook message was cut off after \"the last\", so I couldn't confirm whether it asked for anything beyond what the script produces. I built it from the two manual runs: the language table, the three largest files, and the git summary.\n- The language table is sorted by a key that doesn't produce a clean order. It's cosmetic, but I haven't fixed it.\n\nI haven't run `mm run` yet. The reflex starts earning trust through runs."
+   "result": "The `write-report-md-project` reflex is saved for this project. It is a shell script that writes a `REPORT.md` like the one I made by hand. I tested it into a temp file and its output matched.\n\n- **Script:** `/tmp/mm-reflex/write-report-md-project.sh`. Its installed copy is in the muscle-memory store for this project.\n- **Arguments:** `[output_file=REPORT.md] [top_n=3]`. Both have defaults, so a bare run works.\n- **Contents:** lines of code per language, the largest source files, tooling presence (tests, CI, lint, manifest, `.gitignore`), and git history (commit count, contributors, branches, tags, remote, last 10 commits).\n- **Scope:** it runs from the project root and uses relative paths.\n\nI have not run it through `mm run` yet, so it has no recorded runs and isn't eligible for instinct promotion. To use it next time, run `python3 mm.py run write-report-md-project`.\n\nI did not overwrite the existing `REPORT.md` in the repo. The reflex will overwrite it when run."
   }
  ]
 }

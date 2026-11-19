@@ -1,0 +1,65 @@
+{
+ "prompt": "Cut the next release: work out the semver bump from the conventional commits since the last tag, update package.json's version, add a section at the top of CHANGELOG.md listing those commits, commit it as 'chore: release X.Y.Z' and create the git tag vX.Y.Z.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git describe --tags --abbrev=0 2>/dev/null; echo \\\"---tags\\\"; git tag --sort=-v:refname | head -5; echo \\\"---pkg\\\"; grep '\\\"version\\\"' package.json; echo \\\"---head\\\"; head -30 CHANGELOG.md 2>/dev/null; echo \\\"---log\\\"; git log --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD 2>/dev/null || git log --format='%h %s' | head -30\", \"description\": \"Inspect tags, version,"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git log --format='---%h %s%n%b' v1.4.2..HEAD; echo; git status --short; git config user.name; git config user.email\", \"description\": \"Check full commit messages for breaking changes\"}"
+  },
+  {
+   "text": "The only breaking-change signal is none; there's one `feat` and three fixes/docs since v1.4.2, so this is a minor bump to 1.5.0. Updating the version and changelog now."
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"sed -i '' 's/\\\"version\\\": \\\"1.4.2\\\"/\\\"version\\\": \\\"1.5.0\\\"/' package.json && python3 - <<'EOF'\\np=\\\"CHANGELOG.md\\\"\\ns=open(p).read()\\nnew=\\\"\\\"\\\"## 1.5.0\\n\\n- Feat: dark mode for the TUI (2c513e4)\\n- Fix: request timeout not respected (77fe381)\\n- Fix(auth): refresh expired tokens (d90ebeb)\\n- Docs: install guide (722d380)\\n\\n\\\"\\\"\\\"\\ns=s.replace(\\\"## 1.4.2\\\", new+\\\"## 1.4.2\\\",1)\\nopen("
+  },
+  {
+   "text": "Released 1.5.0: `package.json` is bumped, `CHANGELOG.md` has a new 1.5.0 section, the commit is `09d4c1c chore: release 1.5.0`, and the tag `v1.5.0` is created locally.\n\n- **Bump:** minor. The commits since `v1.4.2` include one `feat` (dark mode for the TUI), and none carry a breaking-change footer.\n- **Changelog entries:** the feat, the three commits (two fixes and a docs change), each with its s"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.006828740000000001,
+   "num_turns": 4,
+   "duration_ms": 10070,
+   "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 24717,
+    "cache_read_input_tokens": 114404,
+    "output_tokens": 1481,
+    "output_tokens_details": {
+     "thinking_tokens": 226
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 24717,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 211,
+      "cache_read_input_tokens": 34878,
+      "cache_creation_input_tokens": 850,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 850
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "Released 1.5.0: `package.json` is bumped, `CHANGELOG.md` has a new 1.5.0 section, the commit is `09d4c1c chore: release 1.5.0`, and the tag `v1.5.0` is created locally.\n\n- **Bump:** minor. The commits since `v1.4.2` include one `feat` (dark mode for the TUI), and none carry a breaking-change footer.\n- **Changelog entries:** the feat, the three commits (two fixes and a docs change), each with its short hash.\n\nI haven't pushed the commit or the tag. Run `git push origin main v1.5.0` when you're ready."
+  }
+ ]
+}

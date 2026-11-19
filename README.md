@@ -8,7 +8,7 @@ A Claude Code plugin that turns your repeated tasks into reflexes,<br>
 and your proven reflexes into instincts that run with **zero tokens**.
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
-![version](https://img.shields.io/badge/version-0.5.0-2a78d6)
+![version](https://img.shields.io/badge/version-0.6.0-2a78d6)
 ![status](https://img.shields.io/badge/status-experimental-eda100)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
@@ -40,7 +40,7 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 | **Unlocks after** | — | 2 runs (automatic) | 2 clean runs + **your approval** |
 
 > [!NOTE]
-> **Status: experimental (v0.5).** It works end to end, and in the latest benchmark all 4 tasks reached zero-token runs, but one of them (`report`) produced the wrong output (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
+> **Status: experimental (v0.6).** It works end to end, and the latest benchmark blocked every wrong result, but only 1 of 5 tasks qualified for zero-token runs (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
 
 ## Install
 
@@ -105,16 +105,17 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 `bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
 
 > [!NOTE]
-> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, all 4 task types on one plugin version (`9aa3cfe`), about $0.20 in total. **All 4 tasks reached instinct, answering in 3–4s for $0.000.** In 3 of the 4, that output was correct. Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
+> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 5 task types including a realistic release (version bump, changelog, commit, tag), about $0.26 in total. **No wrong output got through to a zero-token run.** One task (`changelog`) reached zero-token runs, answering in 3s for $0.000.
 
-| Task | By hand | Reflex | Instinct | Control (plugin off) | Correct output (reflex · instinct) |
-|---|---:|---:|---:|---:|:---:|
-| report | $0.006 | $0.005 | **$0.000** | $0.007 | 1/3 · **0/1** |
-| changelog | $0.006 | $0.001 | **$0.000** | $0.006 | 3/3 · 1/1 |
-| csv | $0.007 | $0.002 | **$0.000** | $0.006 | 3/3 · 1/1 |
-| scaffold | $0.006 | $0.005 | **$0.000** | $0.007 | 3/3 · 1/1 |
+| Task | By hand | Reflex | Instinct | Control (plugin off) | Why it did or didn't reach instinct |
+|---|---:|---:|---:|---:|---|
+| changelog | $0.006 | $0.002 | **$0.000** | $0.004 | script's result matched the by-hand runs |
+| csv | $0.007 | $0.002 | n/a | $0.006 | one clean run short of the two needed |
+| report | $0.007 | $0.005 | n/a | $0.007 | **blocked, correctly**: the script left out the language names (2 of 3 runs wrong) |
+| release | $0.007 | $0.007 | n/a | $0.005 | **blocked, correctly**: the script skipped changelog entries (2 of 3 runs wrong) |
+| scaffold | $0.006 | $0.007 | n/a | $0.007 | blocked: the output didn't mention the `core` module the by-hand runs did (strict) |
 
-Medians. **The `report` miss is real, and it is the main risk of this approach.** The script Haiku compiled labelled languages by file extension (`.py`, `.ts`) instead of by name, so its report no longer matched what was asked. It ran without errors, so nothing flagged it. A reflex is only as good as the script the model wrote. That's why instincts need your approval after you've read the script, and why `mm show <key>` is worth a look. `scaffold` takes an input (the module name), so its instinct runs from a learned pattern: "scaffold a {1} module with a test". Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
+Medians. **What this shows:** a script the model compiles can run cleanly and still be wrong. In an earlier run, before the output check, three zero-token runs produced wrong output. The check compares each script run with the by-hand runs and now stops that. The cost is reach: fewer tasks qualify, and on a cheap model many compiled scripts genuinely aren't good enough. Run-to-run variation is large at this sample size. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
 

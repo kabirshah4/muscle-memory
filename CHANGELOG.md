@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-11-19
 - Output check: a script's result is compared mechanically with the by-hand runs (files, tags, content words) and only matching runs count toward instinct; `mm verify` remains for tasks that change no files
 - Hit rate: `mm list` shows free runs vs near-misses for each instinct
 - Codex: failed or denied tool calls no longer count

@@ -1,0 +1,89 @@
+{
+ "prompt": "cut the next release",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git status --short && git tag --sort=-creatordate | head -5 && git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~5)..HEAD && ls && (cat package.json 2>/dev/null | head -20); ls CHANGELOG* 2>/dev/null && head -30 CHANGELOG* ; ls .github 2>/dev/null; ls scripts 2>/dev/null\", \"description\": \"Inspect repo state, tags, and release files\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat CHANGELOG.md && git show --stat eeb3bed | head -20 && git status --short --ignored | head; git remote -v\", \"description\": \"Read changelog, last release commit, and remotes\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git show eeb3bed -- package.json src/index.js && git log --oneline -1 v1.4.2 && git remote -v; echo \\\"remotes exit $?\\\"\", \"description\": \"Show previous release diff for version bump pattern\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git log --format='%h %s' v1.4.2..HEAD && git diff --stat v1.4.2..HEAD && git diff v1.4.2..HEAD -- src | head -150\", \"description\": \"List unreleased commits and their code changes\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"sed -i '' 's/\\\"version\\\": \\\"1.4.2\\\"/\\\"version\\\": \\\"1.5.0\\\"/' package.json && python3 - <<'EOF'\\np=\\\"CHANGELOG.md\\\"\\ns=open(p).read()\\nnew=\\\"\\\"\\\"# Changelog\\n\\n## 1.5.0\\n\\n- Feat: dark mode for the TUI\\n- Fix: request timeout not respected\\n- Fix: refresh expired tokens (auth)\\n- Docs: install guide\\n\\\"\\\"\\\"\\ns=s.replace(\\\"# Changelog\\\\n\\\",new,1)\\nopen(p,\\\"w\\\").write(s)\\nEOF\\ngit add pa"
+  },
+  {
+   "text": "Released **v1.5.0** locally: a version bump, changelog entry, release commit `4511930`, and annotated tag `v1.5.0`.\n\n- **Version:** 1.4.2 \u2192 1.5.0. The unreleased work includes a `feat` (dark mode for the TUI), so this is a minor bump rather than a patch.\n- **Changelog:** added a 1.5.0 section listing the four commits since v1.4.2: dark mode, the request timeout fix, the auth token refresh fix, and"
+  },
+  {
+   "tool": "Skill",
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"Compile 'cut-next-release-work' into a reflex, per the stop-hook request\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/tmp/mm-scratch/cut-next-release-work.sh\", \"content\": \"#!/usr/bin/env bash\\n# Cut the next release: pick the semver bump from conventional commits since the\\n# last tag, bump package.json, prepend a CHANGELOG section, commit, and tag.\\n# Usage: cut-next-release-work.sh [BUMP=auto|major|minor|patch] [PKG=package.json] [CHANGELOG=CHANGELOG.md]\\nset -euo pipefail\\n\\nBUMP=\\\"${1:-auto}\\\""
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/cut-next-release-work.sh <<'EOF'\\n#!/usr/bin/env bash\\n# Cut the next release: pick the semver bump from conventional commits since the\\n# last tag, bump package.json, prepend a CHANGELOG section, commit, and tag.\\n# Usage: cut-next-release-work.sh [BUMP=auto|major|minor|patch] [PKG=package.json] [CHANGELOG=CHANGELOG.md]\\nset -euo pipe"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save cut-next-release-work /tmp/mm-scratch/cut-next-release-work.sh --summary \\\"Cuts a release from the project root: picks the semver bump from conventional commits since the last tag (breaking, feat, or fix), bumps the package.json version, prepends a changelog section, commits the release, and tags it lo"
+  },
+  {
+   "text": "I compiled `cut-next-release-work` into a reflex and saved it to muscle-memory for this project.\n\nThe script (`/tmp/mm-scratch/cut-next-release-work.sh`) does what the two manual releases did:\n- **Bump:** reads conventional commits since the last tag. A breaking change gives a major bump, a `feat` gives minor, and anything else gives patch. Pass `major`, `minor`, or `patch` to override.\n- **Files:"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.01387532,
+   "num_turns": 12,
+   "duration_ms": 39065,
+   "usage": {
+    "input_tokens": 22,
+    "cache_creation_input_tokens": 31098,
+    "cache_read_input_tokens": 389602,
+    "output_tokens": 7515,
+    "output_tokens_details": {
+     "thinking_tokens": 1969
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 31098,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 395,
+      "cache_read_input_tokens": 44365,
+      "cache_creation_input_tokens": 442,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 442
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I compiled `cut-next-release-work` into a reflex and saved it to muscle-memory for this project.\n\nThe script (`/tmp/mm-scratch/cut-next-release-work.sh`) does what the two manual releases did:\n- **Bump:** reads conventional commits since the last tag. A breaking change gives a major bump, a `feat` gives minor, and anything else gives patch. Pass `major`, `minor`, or `patch` to override.\n- **Files:** bumps the version in `package.json` and prepends a section to `CHANGELOG.md`.\n- **Git:** commits as `chore: release X` with the Co-Authored-By line, and creates a local `vX` tag. It does not push.\n- **Guards:** it refuses to run on a dirty working tree, and exits if there are no releasable commits since the last tag.\n- **Args, all with defaults:** bump mode `auto`, `package.json`, `CHANGELOG.md`.\n\nI only checked the syntax. I didn't run it, because it would create a real commit and tag, and the repo has no unreleased commits right now. The reflex has no `mm run` record yet, so it won't count toward the trust tiers until it's run through `mm run`."
+  }
+ ]
+}
