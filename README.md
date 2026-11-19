@@ -26,7 +26,7 @@ and your proven reflexes into instincts that run with **zero tokens**.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/cost-dark.svg">
-  <img alt="Median cost per request for 4 task types: by hand about $0.006, as a reflex $0.001 to $0.006, as an instinct $0 for all 4 tasks, and $0.005 to $0.007 with the plugin off." src="docs/cost-light.svg" width="100%">
+  <img alt="Median cost per request for 4 task types: by hand about $0.006, as a reflex $0.001 to $0.006, as an instinct $0 for all 4 tasks (3 of 4 with correct output), and $0.005 to $0.007 with the plugin off." src="docs/cost-light.svg" width="100%">
 </picture>
 
 ## Why
@@ -67,7 +67,7 @@ python3 skills/muscle-memory/scripts/mm.py install --cli codex     # or gemini, 
 | CLI | Zero-token instincts and `mm <key>` | Reflex hints | Learns new tasks automatically | Verified |
 |---|:---:|:---:|:---:|---|
 | **Claude Code** | ✅ | ✅ | ✅ | live sessions + benchmark |
-| **Codex CLI** | ✅ | ✅ | ✅ | protocol tests; same hook format as Claude Code. Codex asks you to trust the hooks once |
+| **Codex CLI** | ✅ | ✅ | ✅ | live session (codex-cli 0.170): an approved instinct blocked the prompt and ran with no model call. Codex asks you to trust the hooks once |
 | **Gemini CLI** | ✅ | ✅ | via the skill | protocol tests only |
 | **Cursor CLI** | ✅ | ❌ (no context injection) | via the skill | protocol tests only |
 | **Copilot CLI, OpenCode** | ❌ (their hooks can't stop a prompt) | ❌ | via the skill | copy `skills/muscle-memory` into their skills folder |
@@ -121,16 +121,16 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 `bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
 
 > [!NOTE]
-> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 4 task types, about $0.20 in total. **All 4 tasks reached instinct: answered in ~3s for $0.000, with correct output.** Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
+> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, all 4 task types on one plugin version (`9aa3cfe`), about $0.20 in total. **All 4 tasks reached instinct, answering in 3–4s for $0.000.** In 3 of the 4, that output was correct. Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
 
-| Task | By hand | Reflex | Instinct | Control (plugin off) | Reflex used |
+| Task | By hand | Reflex | Instinct | Control (plugin off) | Correct output (reflex · instinct) |
 |---|---:|---:|---:|---:|:---:|
-| report | $0.006 | $0.005 | **$0.000** | $0.007 | 2/3 |
-| changelog | $0.007 | $0.002 | **$0.000** | $0.005 | 3/3 |
-| csv | $0.007 | $0.001 | **$0.000** | $0.005 | 3/3 |
-| scaffold | $0.006 | $0.005 | **$0.000** | $0.007 | 2/3 |
+| report | $0.006 | $0.005 | **$0.000** | $0.007 | 1/3 · **0/1** |
+| changelog | $0.006 | $0.001 | **$0.000** | $0.006 | 3/3 · 1/1 |
+| csv | $0.007 | $0.002 | **$0.000** | $0.006 | 3/3 · 1/1 |
+| scaffold | $0.006 | $0.005 | **$0.000** | $0.007 | 3/3 · 1/1 |
 
-Medians; every run produced correct output. `scaffold` takes an input (the module name), so its instinct runs from a learned pattern: "scaffold a {1} module with a test". It first missed because its saved summary named one specific module; scripts are now saved with a generic summary, and the `scaffold` rows are from a re-run after that fix. Earlier runs on the default model (Opus) cost 20–30× more per request, so the same zero-call instinct saves proportionally more there. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
+Medians. **The `report` miss is real, and it is the main risk of this approach.** The script Haiku compiled labelled languages by file extension (`.py`, `.ts`) instead of by name, so its report no longer matched what was asked. It ran without errors, so nothing flagged it. A reflex is only as good as the script the model wrote. That's why instincts need your approval after you've read the script, and why `mm show <key>` is worth a look. `scaffold` takes an input (the module name), so its instinct runs from a learned pattern: "scaffold a {1} module with a test". Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
 

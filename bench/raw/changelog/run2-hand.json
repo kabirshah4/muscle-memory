@@ -4,27 +4,27 @@
  "events": [
   {
    "tool": "Bash",
-   "input": "{\"command\": \"git describe --tags --abbrev=0 2>/dev/null; echo \\\"---\\\"; git tag --list | tail -5; echo \\\"---\\\"; git log --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD; echo \\\"---\\\"; ls; echo \\\"---\\\"; head -40 CHANGELOG.md 2>/dev/null\", \"description\": \"Find latest tag, commits since, and changelog head\"}"
+   "input": "{\"command\": \"git describe --tags --abbrev=0 2>/dev/null; echo \\\"---\\\"; git log --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD; echo \\\"---\\\"; head -40 CHANGELOG.md 2>/dev/null; echo \\\"---\\\"; ls\", \"description\": \"Find latest tag, commits since, and changelog\"}"
   },
   {
    "tool": "Edit",
-   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command\\n- Add pagination support to the API\\n\\n### Fixes\\n\\n- Fix crash on empty input\\n- Fix exit code on error\\n\\n### Documentation\\n\\n- Add u"
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-8d76sfck/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command (ae69d66)\\n- Pagination support in API (c826231)\\n\\n### Fixes\\n\\n- Crash on empty input (8a24c25)\\n- Exit with non-zero code on CLI error"
   },
   {
-   "text": "I added an Unreleased section to `CHANGELOG.md` above v0.1.0, covering the six commits since the latest tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command\n- Add pagination support to the API\n\n### Fixes\n\n- Fix crash on empty input\n- Fix exit code on error\n\n### Documentation\n\n- Add usage examples\n```\n\nThe chore commit (`bump deps`) is left out, and the v0.1.0 ent"
+   "text": "I added an Unreleased section to `CHANGELOG.md` above `v0.1.0`, covering the five non-chore commits since that tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command (ae69d66)\n- Pagination support in API (c826231)\n\n### Fixes\n\n- Crash on empty input (8a24c25)\n- Exit with non-zero code on CLI error (e32ad65)\n\n### Documentation\n\n- Usage examples (31f8631)\n```\n\nThe `ch"
   },
   {
    "subtype": "success",
-   "total_cost_usd": 0.005551380000000001,
+   "total_cost_usd": 0.005533620000000001,
    "num_turns": 3,
-   "duration_ms": 5724,
+   "duration_ms": 6150,
    "usage": {
     "input_tokens": 6,
-    "cache_creation_input_tokens": 21307,
-    "cache_read_input_tokens": 82188,
-    "output_tokens": 935,
+    "cache_creation_input_tokens": 21247,
+    "cache_read_input_tokens": 82112,
+    "output_tokens": 925,
     "output_tokens_details": {
-     "thinking_tokens": 219
+     "thinking_tokens": 166
     },
     "server_tool_use": {
      "web_search_requests": 0,
@@ -32,19 +32,19 @@
     },
     "service_tier": "standard",
     "cache_creation": {
-     "ephemeral_1h_input_tokens": 21307,
+     "ephemeral_1h_input_tokens": 21247,
      "ephemeral_5m_input_tokens": 0
     },
     "inference_geo": "global",
     "iterations": [
      {
       "input_tokens": 2,
-      "output_tokens": 199,
-      "cache_read_input_tokens": 34472,
-      "cache_creation_input_tokens": 547,
+      "output_tokens": 232,
+      "cache_read_input_tokens": 34403,
+      "cache_creation_input_tokens": 554,
       "cache_creation": {
        "ephemeral_5m_input_tokens": 0,
-       "ephemeral_1h_input_tokens": 547
+       "ephemeral_1h_input_tokens": 554
       },
       "type": "message"
      }
@@ -52,7 +52,7 @@
     "speed": "standard",
     "fallback_credit": null
    },
-   "result": "I added an Unreleased section to `CHANGELOG.md` above v0.1.0, covering the six commits since the latest tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command\n- Add pagination support to the API\n\n### Fixes\n\n- Fix crash on empty input\n- Fix exit code on error\n\n### Documentation\n\n- Add usage examples\n```\n\nThe chore commit (`bump deps`) is left out, and the v0.1.0 entry is unchanged. I wrote the bullets from the commit subjects, so they keep the commit wording rather than a rewritten summary."
+   "result": "I added an Unreleased section to `CHANGELOG.md` above `v0.1.0`, covering the five non-chore commits since that tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command (ae69d66)\n- Pagination support in API (c826231)\n\n### Fixes\n\n- Crash on empty input (8a24c25)\n- Exit with non-zero code on CLI error (e32ad65)\n\n### Documentation\n\n- Usage examples (31f8631)\n```\n\nThe `chore: bump deps` commit (3691c68) is left out, and the `v0.1.0` entry is unchanged. I wrote the entries from the commit subjects, so reword them if you want more detail."
   }
  ]
 }

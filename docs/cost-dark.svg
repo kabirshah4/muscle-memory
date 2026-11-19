@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="390" viewBox="0 0 720 390" role="img" aria-labelledby="t d" font-family='system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif'>
-<title id="t">Median cost per request, by task and tier</title><desc id="d">report: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007; changelog: By hand $0.007, Reflex $0.002, Instinct $0.000, Control (plugin off) $0.005; csv: By hand $0.007, Reflex $0.001, Instinct $0.000, Control (plugin off) $0.005; scaffold: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007</desc>
+<title id="t">Median cost per request, by task and tier</title><desc id="d">report: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007; changelog: By hand $0.006, Reflex $0.001, Instinct $0.000, Control (plugin off) $0.006; csv: By hand $0.007, Reflex $0.002, Instinct $0.000, Control (plugin off) $0.006; scaffold: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007</desc>
 <rect width="720" height="390" rx="12" fill="#1a1a19"/>
 <text x="24" y="36" font-size="17" font-weight="600" fill="#f0efec">Median cost per request</text>
 <text x="24" y="58" font-size="13" fill="#c3c2b7">4 task types, real claude -p sessions (2026-11-19, Claude Code 2.1.328). n/a: never reached that tier.</text>
@@ -16,29 +16,29 @@
 <text x="54" y="212.0" font-size="11" text-anchor="end" fill="#898781">$0.05</text>
 <line x1="64" x2="696" y1="116.0" y2="116.0" stroke="#2c2c2a" stroke-width="1"/>
 <text x="54" y="120.0" font-size="11" text-anchor="end" fill="#898781">$0.10</text>
-<path d="M104.0,300.0 V293.1 Q104.0,289.1 108.0,289.1 H118.0 Q122.0,289.1 122.0,293.1 V300.0 Z" fill="#3987e5"/>
+<path d="M104.0,300.0 V292.0 Q104.0,288.0 108.0,288.0 H118.0 Q122.0,288.0 122.0,292.0 V300.0 Z" fill="#3987e5"/>
 <path d="M124.0,300.0 V294.4 Q124.0,290.4 128.0,290.4 H138.0 Q142.0,290.4 142.0,294.4 V300.0 Z" fill="#d95926"/>
 <circle cx="153.0" cy="300" r="5" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="153.0" y="288" font-size="11" font-weight="600" text-anchor="middle" fill="#f0efec">$0</text>
-<path d="M164.0,300.0 V291.8 Q164.0,287.8 168.0,287.8 H178.0 Q182.0,287.8 182.0,291.8 V300.0 Z" fill="#6b6a65"/>
+<path d="M164.0,300.0 V290.5 Q164.0,286.5 168.0,286.5 H178.0 Q182.0,286.5 182.0,290.5 V300.0 Z" fill="#6b6a65"/>
 <text x="143.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">report</text>
-<path d="M262.0,300.0 V291.9 Q262.0,287.9 266.0,287.9 H276.0 Q280.0,287.9 280.0,291.9 V300.0 Z" fill="#3987e5"/>
-<path d="M282.0,300.0 V298.6 Q282.0,297.2 283.4,297.2 H298.6 Q300.0,297.2 300.0,298.6 V300.0 Z" fill="#d95926"/>
+<path d="M262.0,300.0 V292.0 Q262.0,288.0 266.0,288.0 H276.0 Q280.0,288.0 280.0,292.0 V300.0 Z" fill="#3987e5"/>
+<path d="M282.0,300.0 V299.2 Q282.0,298.3 282.8,298.3 H299.2 Q300.0,298.3 300.0,299.2 V300.0 Z" fill="#d95926"/>
 <circle cx="311.0" cy="300" r="5" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="311.0" y="288" font-size="11" font-weight="600" text-anchor="middle" fill="#f0efec">$0</text>
-<path d="M322.0,300.0 V295.3 Q322.0,291.3 326.0,291.3 H336.0 Q340.0,291.3 340.0,295.3 V300.0 Z" fill="#6b6a65"/>
+<path d="M322.0,300.0 V292.7 Q322.0,288.7 326.0,288.7 H336.0 Q340.0,288.7 340.0,292.7 V300.0 Z" fill="#6b6a65"/>
 <text x="301.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">changelog</text>
-<path d="M420.0,300.0 V291.1 Q420.0,287.1 424.0,287.1 H434.0 Q438.0,287.1 438.0,291.1 V300.0 Z" fill="#3987e5"/>
-<path d="M440.0,300.0 V298.7 Q440.0,297.4 441.3,297.4 H456.7 Q458.0,297.4 458.0,298.7 V300.0 Z" fill="#d95926"/>
+<path d="M420.0,300.0 V291.3 Q420.0,287.3 424.0,287.3 H434.0 Q438.0,287.3 438.0,291.3 V300.0 Z" fill="#3987e5"/>
+<path d="M440.0,300.0 V298.6 Q440.0,297.2 441.4,297.2 H456.6 Q458.0,297.2 458.0,298.6 V300.0 Z" fill="#d95926"/>
 <circle cx="469.0" cy="300" r="5" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="469.0" y="288" font-size="11" font-weight="600" text-anchor="middle" fill="#f0efec">$0</text>
-<path d="M480.0,300.0 V295.1 Q480.0,291.1 484.0,291.1 H494.0 Q498.0,291.1 498.0,295.1 V300.0 Z" fill="#6b6a65"/>
+<path d="M480.0,300.0 V293.1 Q480.0,289.1 484.0,289.1 H494.0 Q498.0,289.1 498.0,293.1 V300.0 Z" fill="#6b6a65"/>
 <text x="459.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">csv</text>
 <path d="M578.0,300.0 V293.7 Q578.0,289.7 582.0,289.7 H592.0 Q596.0,289.7 596.0,293.7 V300.0 Z" fill="#3987e5"/>
-<path d="M598.0,300.0 V293.9 Q598.0,289.9 602.0,289.9 H612.0 Q616.0,289.9 616.0,293.9 V300.0 Z" fill="#d95926"/>
+<path d="M598.0,300.0 V295.0 Q598.0,291.0 602.0,291.0 H612.0 Q616.0,291.0 616.0,295.0 V300.0 Z" fill="#d95926"/>
 <circle cx="627.0" cy="300" r="5" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
 <text x="627.0" y="288" font-size="11" font-weight="600" text-anchor="middle" fill="#f0efec">$0</text>
-<path d="M638.0,300.0 V290.6 Q638.0,286.6 642.0,286.6 H652.0 Q656.0,286.6 656.0,290.6 V300.0 Z" fill="#6b6a65"/>
+<path d="M638.0,300.0 V290.9 Q638.0,286.9 642.0,286.9 H652.0 Q656.0,286.9 656.0,290.9 V300.0 Z" fill="#6b6a65"/>
 <text x="617.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">scaffold</text>
 <line x1="64" x2="696" y1="300" y2="300" stroke="#383835" stroke-width="1"/>
 <text x="24" y="366" font-size="11" fill="#898781">Data: bench/results.csv · regenerate with python3 bench/run.py, then python3 docs/make_charts.py</text>
