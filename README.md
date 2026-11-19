@@ -161,6 +161,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
 | `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
+| `MUSCLE_MEMORY_COLOR` | `1` | set to `0` for a plain (uncolored) "Done!" line |
 
 </details>
 

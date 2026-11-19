@@ -657,7 +657,10 @@ def emit_stop(reason):
 
 
 def done_message(k, secs, output):
-    return (f"⚡ Done in {secs:.1f}s by muscle-memory, with no model call (0 tokens).\n\n{output}\n\n"
+    head = f"✅ Done! in {secs:.1f}s by muscle-memory, with no model call (0 tokens)."
+    if CLI == "claude" and os.environ.get("MUSCLE_MEMORY_COLOR", "1") != "0":
+        head = f"\033[1;32m{head}\033[0m"
+    return (f"{head}\n\n{output}\n\n"
             f"— '{k}' · say \"{BYPASS}\" to have the agent do it instead")
 
 
