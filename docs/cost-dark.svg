@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="390" viewBox="0 0 720 390" role="img" aria-labelledby="t d" font-family='system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif'>
-<title id="t">Median cost per request, by task and tier</title><desc id="d">report: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007; changelog: By hand $0.007, Reflex $0.002, Instinct $0.000, Control (plugin off) $0.005; csv: By hand $0.007, Reflex $0.001, Instinct $0.000, Control (plugin off) $0.005; scaffold: By hand $0.006, Reflex $0.006, Instinct n/a, Control (plugin off) $0.007</desc>
+<title id="t">Median cost per request, by task and tier</title><desc id="d">report: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007; changelog: By hand $0.007, Reflex $0.002, Instinct $0.000, Control (plugin off) $0.005; csv: By hand $0.007, Reflex $0.001, Instinct $0.000, Control (plugin off) $0.005; scaffold: By hand $0.006, Reflex $0.005, Instinct $0.000, Control (plugin off) $0.007</desc>
 <rect width="720" height="390" rx="12" fill="#1a1a19"/>
 <text x="24" y="36" font-size="17" font-weight="600" fill="#f0efec">Median cost per request</text>
 <text x="24" y="58" font-size="13" fill="#c3c2b7">4 task types, real claude -p sessions (2026-11-19, Claude Code 2.1.328). n/a: never reached that tier.</text>
@@ -35,9 +35,10 @@
 <path d="M480.0,300.0 V295.1 Q480.0,291.1 484.0,291.1 H494.0 Q498.0,291.1 498.0,295.1 V300.0 Z" fill="#6b6a65"/>
 <text x="459.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">csv</text>
 <path d="M578.0,300.0 V293.7 Q578.0,289.7 582.0,289.7 H592.0 Q596.0,289.7 596.0,293.7 V300.0 Z" fill="#3987e5"/>
-<path d="M598.0,300.0 V292.4 Q598.0,288.4 602.0,288.4 H612.0 Q616.0,288.4 616.0,292.4 V300.0 Z" fill="#d95926"/>
-<text x="627.0" y="294" font-size="9" text-anchor="middle" fill="#898781">n/a</text>
-<path d="M638.0,300.0 V290.8 Q638.0,286.8 642.0,286.8 H652.0 Q656.0,286.8 656.0,290.8 V300.0 Z" fill="#6b6a65"/>
+<path d="M598.0,300.0 V293.9 Q598.0,289.9 602.0,289.9 H612.0 Q616.0,289.9 616.0,293.9 V300.0 Z" fill="#d95926"/>
+<circle cx="627.0" cy="300" r="5" fill="#199e70" stroke="#1a1a19" stroke-width="2"/>
+<text x="627.0" y="288" font-size="11" font-weight="600" text-anchor="middle" fill="#f0efec">$0</text>
+<path d="M638.0,300.0 V290.6 Q638.0,286.6 642.0,286.6 H652.0 Q656.0,286.6 656.0,290.6 V300.0 Z" fill="#6b6a65"/>
 <text x="617.0" y="322" font-size="13" text-anchor="middle" fill="#c3c2b7">scaffold</text>
 <line x1="64" x2="696" y1="300" y2="300" stroke="#383835" stroke-width="1"/>
 <text x="24" y="366" font-size="11" fill="#898781">Data: bench/results.csv · regenerate with python3 bench/run.py, then python3 docs/make_charts.py</text>

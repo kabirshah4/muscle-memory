@@ -9,5 +9,6 @@
     "changelog",
     "csv",
     "scaffold"
-  ]
+  ],
+  "note": "scaffold rows re-run after the generic-summary fix (commit 14cdb3b); other tasks from plugin_commit"
 }
