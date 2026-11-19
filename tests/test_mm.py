@@ -497,6 +497,18 @@ class StopHook(Base):
         self.stop("setup ci pipeline caching", 5, sid="x")
         self.assertIn("seen=1 ", self.mm("list"))
 
+    def test_failed_tool_calls_are_not_counted(self):
+        p = os.path.join(self.root, "fail.jsonl")
+        with open(p, "w") as f:
+            f.write(json.dumps({"type": "user", "message": {"content": "set up the database fixtures"}}) + "\n")
+            for i in range(3):
+                f.write(json.dumps({"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": f"t{i}", "name": "Bash", "input": {"command": "x"}}]}}) + "\n")
+                f.write(json.dumps({"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": f"t{i}", "is_error": i > 0, "content": "e"}]}}) + "\n")
+        self.mm("stop-hook", stdin=json.dumps({"transcript_path": p, "cwd": self.a}))
+        self.assertIn("no tasks recorded", self.mm("list"))  # 1 successful call < MIN_CALLS
+
     def test_turn_that_used_mm_is_skipped_in_both_forms(self):
         for cmd in ('python3 /x/mm.py log k "s"', 'MM=/x/scripts/mm.py; python3 "$MM" run k'):
             self.assertEqual(self.stop("set up the database fixtures", 5, sid=cmd, extra=[cmd]).strip(), "", cmd)
