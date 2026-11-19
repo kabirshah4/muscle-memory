@@ -118,7 +118,7 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
             result = m
     text = str(result.get("result", ""))
     if result.get("is_error") or "hit your" in text and "limit" in text or (result and not calls
-            and "muscle-memory ran the instinct" not in text and not (result.get("usage") or {}).get("output_tokens")):
+            and "by muscle-memory, with no model call" not in text and not (result.get("usage") or {}).get("output_tokens")):
         raise BenchAborted(f"session did not run (usage limit or API error): {text[:160]!r}")
     u = result.get("usage") or {}
     return {
@@ -128,7 +128,7 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
         "cache_write_tokens": u.get("cache_creation_input_tokens", 0),
         "input_tokens": u.get("input_tokens", 0),
         "tool_calls": calls,
-        "used_reflex": used or "muscle-memory ran the instinct" in str(result.get("result", "")),
+        "used_reflex": used or "by muscle-memory, with no model call" in str(result.get("result", "")),
         "duration_s": round(dur, 1),
         "note": "" if result else f"no result (exit {p.returncode}): {p.stderr[-200:]}",
     }
