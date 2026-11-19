@@ -472,6 +472,32 @@ def fingerprint(root, snap):
     return {"paths": sorted(paths)[:200], "tags": len(tags), "tokens": sorted(set(TOKEN.findall(text.lower())))[:3000]}
 
 
+COMMON = set("""
+about above after again all also an and any are as at be because been before being below both but by can
+could did do does doing done down during each else even every few for from further had has have having
+here how if in into is it its itself just last least less like made make many may more most much must
+my new next no nor not now of off on once one only or other our out over own per same see should since
+so some such than that the their them then there these they this those through to too under until up
+upon us very was we were what when where which while who whom why will with within without would yet
+you your total file files line lines count counts report section summary list using used use each
+added adds add here following shows show based note notes current currently project repo repository
+""".split())
+
+
+def salient(tokens):
+    """Words that carry information: numbers, names, identifiers. Prose filler and absolute paths vary
+    with how something was written, not with whether it's right, so they're not required."""
+    out = set()
+    for t in tokens:
+        t = t.strip("./-_")
+        if len(t) < 3 or t in STOP or t in COMMON or t.startswith(("private/", "var/", "tmp/", "users/", "home/")):
+            continue
+        if "/private/" in t or "/var/folders/" in t or "/users/" in t:
+            continue
+        out.add(t)
+    return out
+
+
 def checkable(e):
     """The by-hand runs changed files or tags, so the script's result can be compared mechanically."""
     fps = [f for f in e.get("hand_fps", []) if isinstance(f, dict)]
@@ -483,10 +509,10 @@ def compare(fps, fp):
     if fp is None:
         return False, "couldn't read the repo state after the run"
     need_paths = set.intersection(*(set(f.get("paths", [])) for f in fps))
-    need_words = set.intersection(*(set(f.get("tokens", [])) for f in fps))
+    need_words = set.intersection(*(salient(f.get("tokens", [])) for f in fps))
     need_tags = min(f.get("tags", 0) for f in fps)
     missing_paths = sorted(need_paths - set(fp["paths"]))
-    missing_words = sorted(need_words - set(fp["tokens"]))
+    missing_words = sorted(need_words - salient(fp["tokens"]))
     problems = []
     if missing_paths:
         problems.append("didn't change " + ", ".join(missing_paths[:8]))
