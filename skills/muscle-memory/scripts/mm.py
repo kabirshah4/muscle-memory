@@ -647,8 +647,8 @@ def prompt_hook(data):
         if rc == 0:
             bump(scope, k, "uses", quiet=True)
             print(json.dumps({"decision": "block", "reason":
-                f"⚡ muscle-memory ran the instinct '{k}' ({path}) with no model call; Claude didn't see "
-                f"this prompt or its output. Add \"{BYPASS}\" to a prompt to have Claude do it instead.\n\n{output}"}))
+                f"⚡ muscle-memory ran the instinct '{k}' with no model call (0 tokens). "
+                f"Add \"{BYPASS}\" to have Claude do it instead.\n\n{output}"}))
             return
         bump(scope, k, "fails", quiet=True)
         print(f"[muscle-memory] The instinct '{k}' just failed (exit {rc}) and was demoted. Output:\n{output}\n"

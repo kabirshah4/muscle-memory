@@ -19,6 +19,11 @@ and your proven reflexes into instincts that run with **zero tokens**.
 
 <br>
 
+<p align="center">
+  <img alt="A real Claude Code session: typing 'update the health report' is answered by the hook, which runs the approved script with no model call and shows its output. Typing 'mm health-report' does the same." src="docs/demo.gif" width="100%">
+  <br><sub>A real Claude Code session (Opus). Both prompts were answered by the hook: no model call, 0 tokens.</sub>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/cost-dark.svg">
   <img alt="Median cost per request for 4 task types: by hand about $0.006, as a reflex $0.001 to $0.006, as an instinct $0 for all 4 tasks, and $0.005 to $0.007 with the plugin off." src="docs/cost-light.svg" width="100%">
