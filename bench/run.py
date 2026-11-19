@@ -39,6 +39,10 @@ MM = os.path.join(REPO, "skills", "muscle-memory", "scripts", "mm.py")
 sys.path.insert(0, HERE)
 from tasks import TASKS  # noqa: E402
 
+class BenchAborted(RuntimeError):
+    """A session failed for reasons unrelated to the plugin; its numbers would be meaningless."""
+
+
 DISABLE_INSTALLED = json.dumps({"enabledPlugins": {"muscle-memory@muscle-memory": False}})
 FIELDS = ["task", "run", "phase", "used_reflex", "state_before", "ok", "cost_usd", "output_tokens", "cache_read_tokens",
           "cache_write_tokens", "input_tokens", "tool_calls", "duration_s", "note"]
@@ -112,6 +116,10 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
                         used = True
         elif m.get("type") == "result":
             result = m
+    text = str(result.get("result", ""))
+    if result.get("is_error") or "hit your" in text and "limit" in text or (result and not calls
+            and "muscle-memory ran the instinct" not in text and not (result.get("usage") or {}).get("output_tokens")):
+        raise BenchAborted(f"session did not run (usage limit or API error): {text[:160]!r}")
     u = result.get("usage") or {}
     return {
         "cost_usd": round(result.get("total_cost_usd") or 0, 4),
@@ -120,7 +128,7 @@ def claude(cwd, prompt, store, plugin, model, raw_path):
         "cache_write_tokens": u.get("cache_creation_input_tokens", 0),
         "input_tokens": u.get("input_tokens", 0),
         "tool_calls": calls,
-        "used_reflex": used or (not calls and bool(result)),  # 0 calls + a result = the instinct answered
+        "used_reflex": used or "muscle-memory ran the instinct" in str(result.get("result", "")),
         "duration_s": round(dur, 1),
         "note": "" if result else f"no result (exit {p.returncode}): {p.stderr[-200:]}",
     }
@@ -212,13 +220,17 @@ def main():
     if unknown:
         sys.exit(f"unknown task(s): {', '.join(unknown)}")
     root = tempfile.mkdtemp(prefix="mm-bench-")
-    raw_dir = os.path.join(HERE, "raw")
-    shutil.rmtree(raw_dir, ignore_errors=True)
+    raw_dir = os.path.join(root, "raw")  # copied into bench/raw only if the whole run succeeds
     version = subprocess.run(["claude", "--version"], capture_output=True, text=True).stdout.strip()
     commit = subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     try:
-        with ThreadPoolExecutor(len(names)) as ex:
-            results = list(ex.map(lambda n: run_task(n, a.model, root, raw_dir), names))
+        try:
+            with ThreadPoolExecutor(len(names)) as ex:
+                results = list(ex.map(lambda n: run_task(n, a.model, root, raw_dir), names))
+        except BenchAborted as err:
+            sys.exit(f"benchmark aborted, results.csv left unchanged: {err}")
+        shutil.rmtree(os.path.join(HERE, "raw"), ignore_errors=True)
+        shutil.copytree(raw_dir, os.path.join(HERE, "raw"))
     finally:
         if a.keep:
             print("kept", root)
