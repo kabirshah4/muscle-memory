@@ -1,0 +1,58 @@
+{
+ "prompt": "update the changelog since the last tag",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py run add-commits-since-latest\", \"description\": \"Run the add-commits-since-latest changelog routine\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git status --short && git diff | head -60\", \"description\": \"Check the CHANGELOG.md diff\"}"
+  },
+  {
+   "text": "I added an `Unreleased` section to `CHANGELOG.md` covering the commits since `v0.1.0`. The change is uncommitted.\n\n- **Features:** pagination support (`4d5499a`), add export command (`f9a2ea8`)\n- **Fixes:** exit code on error (`2f10020`), crash on empty input (`6aaca99`)\n- **Docs:** usage examples (`70ffbf4`)\n\nThe `chore: bump deps` commit (`adccefe`) was left out, since the script skips chore com"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.0015351700000000002,
+   "num_turns": 3,
+   "duration_ms": 6620,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 816,
+    "cache_read_input_tokens": 102787,
+    "output_tokens": 687,
+    "output_tokens_details": {
+     "thinking_tokens": 131
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 816,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 353,
+      "cache_read_input_tokens": 34505,
+      "cache_creation_input_tokens": 452,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 452
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an `Unreleased` section to `CHANGELOG.md` covering the commits since `v0.1.0`. The change is uncommitted.\n\n- **Features:** pagination support (`4d5499a`), add export command (`f9a2ea8`)\n- **Fixes:** exit code on error (`2f10020`), crash on empty input (`6aaca99`)\n- **Docs:** usage examples (`70ffbf4`)\n\nThe `chore: bump deps` commit (`adccefe`) was left out, since the script skips chore commits.\n\nThe muscle-memory routine that generated this is now eligible to become an instinct. You can review and approve it in your terminal with `python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py promote add-commits-since-latest`."
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "prompt": "Prepend an Unreleased section to CHANGELOG.md listing commits since the last tag, grouped by conventional-commit type (features, fixes, docs; no chores).",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git describe --tags --abbrev=0 2>/dev/null; echo \\\"---TAGS\\\"; git tag --list | tail -5; echo \\\"---LOG\\\"; git log --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD 2>/dev/null || git log --format='%h %s'; echo \\\"---CHANGELOG\\\"; ls; head -30 CHANGELOG.md 2>/dev/null\", \"description\": \"Inspect tags, commits, and existing changelog\"}"
+  },
+  {
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- **api:** pagination support (4d5499a)\\n- add export command (f9a2ea8)\\n\\n### Fixes\\n\\n- **cli:** exit code on error (2f10020)\\n- crash on empty input (6aaca"
+  },
+  {
+   "text": "I added an Unreleased section at the top of `CHANGELOG.md`, above v0.1.0. It covers the six commits since the `v0.1.0` tag:\n\n- **Features:** pagination support (`4d5499a`), add export command (`f9a2ea8`)\n- **Fixes:** exit code on error (`2f10020`), crash on empty input (`6aaca99`)\n- **Docs:** usage examples (`70ffbf4`)\n\nI left out `adccefe chore: bump deps` as requested. The changelog is not commi"
+  },
+  {
+   "tool": "Skill",
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/tmp/mm-reflex/add-commits-since-latest.sh\", \"content\": \"#!/usr/bin/env bash\\n# Prepend an Unreleased section to CHANGELOG.md listing commits since the latest tag,\\n# grouped by conventional-commit type (Features / Fixes / Docs). chore/other types are skipped.\\n# Run from the project root.\\n# Args (all optional):\\n#   $1 changelog path   (default: CHANGELOG.md)\\n#   $2 section headi"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git show HEAD:CHANGELOG.md > /tmp/mm-reflex-test-cl.md && bash /tmp/mm-reflex/add-commits-since-latest.sh /tmp/mm-reflex-test-cl.md && cat /tmp/mm-reflex-test-cl.md && echo ---- && diff /tmp/mm-reflex-test-cl.md CHANGELOG.md && echo SAME_AS_HAND_EDIT\", \"description\": \"Test reflex on a copy of the original changelog and compare\"}"
+  },
+  {
+   "text": "The regex literal didn't parse in bash. I'll move it into a variable and retest."
+  },
+  {
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/tmp/mm-reflex/add-commits-since-latest.sh\", \"old_string\": \"  if [[ \\\"$subj\\\" =~ ^([a-z]+)(\\\\(([^)]*)\\\\))?!?:\\\\ (.*)$ ]]; then\", \"new_string\": \"  re='^([a-z]+)(\\\\(([^)]*)\\\\))?!?: (.*)$'\\n  if [[ \\\"$subj\\\" =~ $re ]]; then\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git show HEAD:CHANGELOG.md > /tmp/mm-reflex-test-cl.md && bash /tmp/mm-reflex/add-commits-since-latest.sh /tmp/mm-reflex-test-cl.md && diff /tmp/mm-reflex-test-cl.md CHANGELOG.md && echo SAME_AS_HAND_EDIT\", \"description\": \"Retest reflex on a copy and compare to the hand edit\"}"
+  },
+  {
+   "text": "The reflex reproduces the hand edit exactly. Now I'll save it."
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save add-commits-since-latest /tmp/mm-reflex/add-commits-since-latest.sh; echo \\\"exit=$?\\\"; rm -f /tmp/mm-reflex-test-cl.md\", \"description\": \"Save the changelog reflex with muscle-memory\"}"
+  },
+  {
+   "text": "I saved the changelog task as a reflex named `add-commits-since-latest`, scoped to this project.\n\n- **Script:** `/tmp/mm-reflex/add-commits-since-latest.sh`. It takes three optional arguments: the changelog path (default `CHANGELOG.md`), the section heading (default `Unreleased`), and the starting ref (default the latest tag). It groups commits into Features, Fixes and Docs, and skips other types "
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.01198249,
+   "num_turns": 11,
+   "duration_ms": 34762,
+   "usage": {
+    "input_tokens": 16,
+    "cache_creation_input_tokens": 29665,
+    "cache_read_input_tokens": 275489,
+    "output_tokens": 6586,
+    "output_tokens_details": {
+     "thinking_tokens": 3126
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 29665,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 355,
+      "cache_read_input_tokens": 42977,
+      "cache_creation_input_tokens": 400,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 400
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I saved the changelog task as a reflex named `add-commits-since-latest`, scoped to this project.\n\n- **Script:** `/tmp/mm-reflex/add-commits-since-latest.sh`. It takes three optional arguments: the changelog path (default `CHANGELOG.md`), the section heading (default `Unreleased`), and the starting ref (default the latest tag). It groups commits into Features, Fixes and Docs, and skips other types such as `chore`.\n- **Verified:** I ran it on the original `CHANGELOG.md` from git. Its output matches the Unreleased section I wrote by hand, byte for byte. It also refuses to run if the section already exists, so it won't duplicate it.\n- **Known limit:** a commit whose subject starts with `add ` but has no conventional prefix is filed under Features. That rule is what picked up `add export command`; it is a guess, not a general rule.\n- **Saved:** `mm.py save` stored it under the project's reflex store. I didn't run it through `mm run` yet, so it hasn't earned any trust record."
+  }
+ ]
+}

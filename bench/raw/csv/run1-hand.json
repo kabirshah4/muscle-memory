@@ -1,0 +1,62 @@
+{
+ "prompt": "Summarize every CSV in data/ into data/summary.json: for each file its row count, its column names, and min/max/mean for each numeric column.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"ls -la && ls -la data 2>/dev/null; find . -name \\\"*.csv\\\" -not -path \\\"./.git/*\\\" | head -100\", \"description\": \"List repo files and CSVs\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cd /private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/csv/data && cat sales.csv; echo ---; cat users.csv; echo ---; file sales.csv users.csv\", \"description\": \"Show contents of both CSV files\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/csv/data/summary.json\", \"content\": \"{\\n  \\\"sales.csv\\\": {\\n    \\\"row_count\\\": 5,\\n    \\\"columns\\\": [\\\"region\\\", \\\"units\\\", \\\"price\\\"],\\n    \\\"numeric_columns\\\": {\\n      \\\"units\\\": {\\\"min\\\": 3, \\\"max\\\": 20, \\\"mean\\\": 10.2},\\n      \\\"price\\\": {\\\"min\\\": 8.25, \\\"max\\\": 15.0, \\\"mean\\\": 10.65}\\n    }\\n  },\\n  \\\"us"
+  },
+  {
+   "text": "I wrote `data/summary.json` covering both CSVs in `data/`: `sales.csv` and `users.csv`.\n\n- **sales.csv**: 5 rows; columns `region`, `units`, `price`.\n  - `units`: min 3, max 20, mean 10.2\n  - `price`: min 8.25, max 15.0, mean 10.65\n- **users.csv**: 3 rows; columns `name`, `age`, `plan`.\n  - `age`: min 24, max 45, mean 33.3333 (rounded to 4 decimals; the exact value is 100/3)\n\nOnly columns with num"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.006877219999999999,
+   "num_turns": 4,
+   "duration_ms": 9868,
+   "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 24861,
+    "cache_read_input_tokens": 114222,
+    "output_tokens": 1524,
+    "output_tokens_details": {
+     "thinking_tokens": 568
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 24861,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 280,
+      "cache_read_input_tokens": 34861,
+      "cache_creation_input_tokens": 1011,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 1011
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I wrote `data/summary.json` covering both CSVs in `data/`: `sales.csv` and `users.csv`.\n\n- **sales.csv**: 5 rows; columns `region`, `units`, `price`.\n  - `units`: min 3, max 20, mean 10.2\n  - `price`: min 8.25, max 15.0, mean 10.65\n- **users.csv**: 3 rows; columns `name`, `age`, `plan`.\n  - `age`: min 24, max 45, mean 33.3333 (rounded to 4 decimals; the exact value is 100/3)\n\nOnly columns with numeric values get min/max/mean. `region`, `name` and `plan` are text, so they're listed under `columns` but have no stats.\n\nI computed the figures by hand from the file contents rather than with a script, and I didn't run any code. The file is not committed."
+  }
+ ]
+}

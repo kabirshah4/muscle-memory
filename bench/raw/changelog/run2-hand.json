@@ -1,0 +1,58 @@
+{
+ "prompt": "Add the commits since the latest tag to CHANGELOG.md as an Unreleased section grouped by type (Features / Fixes / Documentation). Leave older entries untouched and ignore chores.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git describe --tags --abbrev=0 2>/dev/null; echo \\\"---\\\"; git tag --list | tail -5; echo \\\"---\\\"; git log --format='%h %s' $(git describe --tags --abbrev=0 2>/dev/null)..HEAD; echo \\\"---\\\"; ls; echo \\\"---\\\"; head -40 CHANGELOG.md 2>/dev/null\", \"description\": \"Find latest tag, commits since, and changelog head\"}"
+  },
+  {
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/changelog/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## v0.1.0\", \"new_string\": \"# Changelog\\n\\n## Unreleased\\n\\n### Features\\n\\n- Add export command\\n- Add pagination support to the API\\n\\n### Fixes\\n\\n- Fix crash on empty input\\n- Fix exit code on error\\n\\n### Documentation\\n\\n- Add u"
+  },
+  {
+   "text": "I added an Unreleased section to `CHANGELOG.md` above v0.1.0, covering the six commits since the latest tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command\n- Add pagination support to the API\n\n### Fixes\n\n- Fix crash on empty input\n- Fix exit code on error\n\n### Documentation\n\n- Add usage examples\n```\n\nThe chore commit (`bump deps`) is left out, and the v0.1.0 ent"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.005551380000000001,
+   "num_turns": 3,
+   "duration_ms": 5724,
+   "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 21307,
+    "cache_read_input_tokens": 82188,
+    "output_tokens": 935,
+    "output_tokens_details": {
+     "thinking_tokens": 219
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 21307,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 199,
+      "cache_read_input_tokens": 34472,
+      "cache_creation_input_tokens": 547,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 547
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I added an Unreleased section to `CHANGELOG.md` above v0.1.0, covering the six commits since the latest tag. I didn't commit it.\n\n```markdown\n## Unreleased\n\n### Features\n\n- Add export command\n- Add pagination support to the API\n\n### Fixes\n\n- Fix crash on empty input\n- Fix exit code on error\n\n### Documentation\n\n- Add usage examples\n```\n\nThe chore commit (`bump deps`) is left out, and the v0.1.0 entry is unchanged. I wrote the bullets from the commit subjects, so they keep the commit wording rather than a rewritten summary."
+  }
+ ]
+}

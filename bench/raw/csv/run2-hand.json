@@ -1,0 +1,70 @@
+{
+ "prompt": "Write data/summary.json describing each CSV under data/: number of rows, columns, and min, max and mean of every numeric column.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"ls -la && ls -la data 2>/dev/null; find . -name \\\"*.csv\\\" -not -path \\\"./.git/*\\\" | head -100; wc -l $(find . -name \\\"*.csv\\\" -not -path \\\"./.git/*\\\") 2>/dev/null | tail -1\", \"description\": \"List workspace and CSV files\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cd /private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/csv/data && cat -A sales.csv; echo ---; cat -A users.csv\", \"description\": \"Show raw contents of both CSV files\"}"
+  },
+  {
+   "tool": "Read",
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/csv/data/sales.csv\"}"
+  },
+  {
+   "tool": "Read",
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-tnrbxpz4/csv/data/users.csv\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"mkdir -p /tmp/csv-summary && cat > /tmp/csv-summary/summarize.py <<'EOF'\\nimport csv, json, os, sys\\n\\ndata_dir = sys.argv[1]\\nout_path = sys.argv[2]\\n\\ndef is_number(s):\\n    try:\\n        float(s)\\n        return True\\n    except ValueError:\\n        return False\\n\\nsummary = {}\\nfor name in sorted(os.listdir(data_dir)):\\n    if not name.endswith(\\\".csv\\\"):\\n        continue\\n    wi"
+  },
+  {
+   "text": "I wrote `data/summary.json` covering both CSVs in `data/`. I checked the means by hand against the raw rows.\n\n- **`sales.csv`**: 5 rows, columns `region`, `units`, `price`.\n  - `units`: min 3, max 20, mean 10.2\n  - `price`: min 8.25, max 15.0, mean 10.65\n- **`users.csv`**: 3 rows, columns `name`, `age`, `plan`.\n  - `age`: min 24, max 45, mean 33.333\u2026\n\nNon-numeric columns (`region`, `name`, `plan`)"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.007041340000000001,
+   "num_turns": 6,
+   "duration_ms": 11244,
+   "usage": {
+    "input_tokens": 10,
+    "cache_creation_input_tokens": 22711,
+    "cache_read_input_tokens": 151964,
+    "output_tokens": 1957,
+    "output_tokens_details": {
+     "thinking_tokens": 361
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 22711,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 347,
+      "cache_read_input_tokens": 35130,
+      "cache_creation_input_tokens": 1292,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 1292
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "I wrote `data/summary.json` covering both CSVs in `data/`. I checked the means by hand against the raw rows.\n\n- **`sales.csv`**: 5 rows, columns `region`, `units`, `price`.\n  - `units`: min 3, max 20, mean 10.2\n  - `price`: min 8.25, max 15.0, mean 10.65\n- **`users.csv`**: 3 rows, columns `name`, `age`, `plan`.\n  - `age`: min 24, max 45, mean 33.333\u2026\n\nNon-numeric columns (`region`, `name`, `plan`) are listed under `columns` but get no stats. The file is untracked, and I didn't commit it. The script that generated it is in `/tmp/csv-summary/`, outside the repo."
+  }
+ ]
+}

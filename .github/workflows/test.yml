@@ -14,4 +14,11 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: git config --global init.defaultBranch main
-      - run: python -W error::ResourceWarning -m unittest discover -v tests
+      - name: Compile every Python file
+        run: python -m compileall -q skills bench docs tests
+      - name: Tests
+        run: python -W error::ResourceWarning -m unittest discover -v tests
+      - name: Charts match the committed benchmark data
+        run: |
+          python docs/make_charts.py
+          git diff --exit-code docs/

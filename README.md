@@ -8,7 +8,7 @@ A Claude Code plugin that turns your repeated tasks into reflexes,<br>
 and your proven reflexes into instincts that run with **zero tokens**.
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
-![version](https://img.shields.io/badge/version-0.4.0-2a78d6)
+![version](https://img.shields.io/badge/version-0.5.0-2a78d6)
 ![status](https://img.shields.io/badge/status-experimental-eda100)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
@@ -19,9 +19,14 @@ and your proven reflexes into instincts that run with **zero tokens**.
 
 <br>
 
+<p align="center">
+  <img alt="A real Claude Code session: typing 'update the health report' is answered by the hook, which runs the approved script with no model call and shows its output. Typing 'mm health-report' does the same." src="docs/demo.gif" width="100%">
+  <br><sub>A real Claude Code session (Opus). Both prompts were answered by the hook: no model call, 0 tokens.</sub>
+</p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/cost-dark.svg">
-  <img alt="Cost per request across 7 runs of the same task: $0.265, $0.104 and $0.248 by hand; $0.185, $0.042 and $0.031 as a reflex; $0 as an instinct." src="docs/cost-light.svg" width="100%">
+  <img alt="Median cost per request for 4 task types: by hand about $0.006, as a reflex $0.001 to $0.006, as an instinct $0 for all 4 tasks, and $0.005 to $0.007 with the plugin off." src="docs/cost-light.svg" width="100%">
 </picture>
 
 ## Why
@@ -32,11 +37,10 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 |---|:---:|:---:|:---:|
 | **Who does it** | Claude, from scratch | Claude runs a saved script | The hook runs it before Claude is called |
 | **Tool calls** | 2–7 | 1–3 | **0** |
-| **Cost (example)** | $0.10–0.27 | $0.03–0.19 | **$0.00** |
-| **Unlocks after** | — | 3 repeats (automatic) | 3 clean runs + **your approval** |
+| **Unlocks after** | — | 2 runs (automatic) | 2 clean runs + **your approval** |
 
 > [!NOTE]
-> **Status: experimental (v0.3).** It works end to end, but it has only been tested on a small number of tasks. Issues and feedback welcome.
+> **Status: experimental (v0.5).** It works end to end, and the latest benchmark shows all 4 tasks reaching zero-token runs (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
 
 ## Install
 
@@ -59,20 +63,20 @@ flowchart LR
     A([You ask for a task]) --> B{Known reflex<br>for this project?}
     B -- no --> C[Claude does it by hand]
     C --> D[Stop hook counts it]
-    D -- 3rd time --> E[Claude compiles a reflex<br>script or recipe]
+    D -- 2nd time --> E[Claude compiles a reflex<br>script or recipe]
     B -- yes, reflex --> F[Claude runs it<br>1–3 tool calls]
-    F -- 3 clean runs --> G[Eligible: you review<br>and approve the script]
+    F -- 2 clean runs --> G[Eligible: you review<br>and approve the script]
     B -- yes, instinct --> H[Hook runs it<br>⚡ 0 tokens]
     H -. fails .-> I[Demoted:<br>Claude takes over]
 ```
 
 | Phase | What happens | Model cost |
 |---|---|---|
-| **Discover** | A `Stop` hook counts the tool calls in each turn. After a 3+ call turn on a task it doesn't know, it asks Claude whether the task could recur. It asks **at most once per session.** | one short turn, max once per session |
+| **Discover** | A `Stop` hook counts the tool calls in each turn. After a 3+ call turn on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
-| **Compile** | On the 3rd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
+| **Compile** | On the 2nd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
-| **Instinct** | After 3 successful runs in a row with no args, a script reflex becomes **eligible**. **Only you can promote it**: `mm promote <key>` shows the exact script, and `--confirm <hash>` approves it. From then on, a short, strongly matching prompt runs it with **no model call**. Editing the script revokes approval. | **zero** |
+| **Instinct** | After 2 successful runs in a row, a script reflex becomes **eligible**. A run can have no inputs, or inputs that appear word for word in your prompt: "deploy the worker to staging" run with `staging` teaches the pattern `deploy the worker to {1}`. **Only you can promote it**, in your own terminal: `mm promote <key>` shows the script, its hash and the prompt wordings and patterns it will answer to, then asks you to type `yes`. When a reflex becomes eligible, the hook tells **you** directly; that message never reaches Claude, so it costs no tokens. From then on, a prompt with the same words as an approved wording, or one that follows an approved pattern word for word, runs it with **no model call**. The slot words become the script's arguments. Editing the script revokes approval. | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
 
 ### Scoping
@@ -96,32 +100,28 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 
 ## Measured results
 
+`bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Raw transcripts are in `bench/raw/`.
+
 > [!NOTE]
-> **One example, not a benchmark.** These are headless `claude -p` sessions running a "write a repo health report" task on a small test repo, with the plugin installed from GitHub. Your numbers will depend on the task and your setup.
+> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 4 task types, about $0.20 in total. **All 4 tasks reached instinct: answered in ~3s for $0.000, with correct output.** Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/speed-dark.svg">
-  <img alt="Time to answer: 32 seconds by hand, 13 seconds as a reflex, 3 seconds as an instinct." src="docs/speed-light.svg" width="100%">
-</picture>
+| Task | By hand | Reflex | Instinct | Control (plugin off) | Reflex used |
+|---|---:|---:|---:|---:|:---:|
+| report | $0.006 | $0.005 | **$0.000** | $0.007 | 2/3 |
+| changelog | $0.007 | $0.002 | **$0.000** | $0.005 | 3/3 |
+| csv | $0.007 | $0.001 | **$0.000** | $0.005 | 3/3 |
+| scaffold | $0.006 | $0.005 | **$0.000** | $0.007 | 2/3 |
 
-| Run | Tier | What happened | Cost |
-|:---:|---|---|---:|
-| 1 | By hand | Asked once whether to log the new task | $0.265 |
-| 2 | By hand | Counted by the hook, no extra turn | $0.104 |
-| 3 | By hand | Threshold reached, reflex compiled | $0.248 |
-| 4 | Reflex | Claude ran the script | $0.185 |
-| 5 | Reflex | | $0.042 |
-| 6 | Reflex | Promoted to instinct | $0.031 |
-| 7 | **Instinct** | **Hook ran it, no model call, ~3s** | **$0.000** |
-
-Costs vary a lot from run to run because of prompt caching (the first call in a while pays to write the cache). Rule of thumb: the more exploring a task normally takes, the more a reflex saves. Instinct is where the big difference is, because it removes the model call entirely. It only covers requests that need no task-specific inputs, like "the usual report" or "deploy staging".
+Medians; every run produced correct output. `scaffold` takes an input (the module name), so its instinct runs from a learned pattern: "scaffold a {1} module with a test". It first missed because its saved summary named one specific module; scripts are now saved with a generic summary, and the `scaffold` rows are from a re-run after that fix. Earlier runs on the default model (Opus) cost 20–30× more per request, so the same zero-call instinct saves proportionally more there. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
+
+**Zero-token shortcut:** type `mm <key> [args]` as your whole prompt (for example `mm deploy-worker staging`). The hook runs that script reflex and shows you the output. Claude is never called, and since you named the reflex yourself, it needs no approval or matching. Any other prompt that starts with "mm" goes to Claude as normal.
 
 To skip reflexes for one prompt, include the phrase **`no reflex`**. To manage them yourself:
 
 ```bash
-alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*/skills/muscle-memory/scripts/mm.py | tail -1)"'
+alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*/skills/muscle-memory/scripts/mm.py | sort -V | tail -1)"'
 ```
 
 | Command | Does |
@@ -129,7 +129,7 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | `mm list` | tasks in this project + global (`--all` for every project) |
 | `mm show <key>` | print a reflex |
 | `mm run <key> [args]` | execute a reflex and record success/failure |
-| `mm promote <key>` | review the script, then approve it with `--confirm <hash>` |
+| `mm promote <key>` | review the script and its wordings, then type `yes` (terminal only) |
 | `mm demote <key>` | stop it running without Claude |
 | `mm forget <key>` | delete it |
 
@@ -138,10 +138,10 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `MUSCLE_MEMORY_THRESHOLD` | `3` | repeats before compiling |
-| `MUSCLE_MEMORY_INSTINCT_AFTER` | `3` | clean no-arg runs before a reflex becomes an instinct |
-| `MUSCLE_MEMORY_MIN_CALLS` | `3` | tool calls in a turn before it counts as a task |
-| `MUSCLE_MEMORY_ASK` | `1` | set to `0` to never be asked about new tasks (only known tasks are counted) |
+| `MUSCLE_MEMORY_THRESHOLD` | `2` | repeats before compiling |
+| `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean no-arg runs before a reflex becomes an instinct |
+| `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
+| `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
 
 </details>
@@ -150,27 +150,27 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 
 Reflexes are scripts that Claude writes and runs on your machine. They stay local and are never uploaded. Because instincts run with no model in the loop, they need:
 
-- ✅ 3 clean runs as a reflex first
-- ✅ **your explicit approval** after seeing the script (`mm promote <key>`), pinned to its hash
-- ✅ a strong match: score ≥ 0.75, at least 2 shared words, and a short prompt (≤ 12 words)
+- ✅ 2 clean runs as a reflex first
+- ✅ **your explicit approval** in an interactive terminal after seeing the script (`mm promote <key>`), pinned to its sha256 hash. The hash covers that one file only, not other scripts it calls.
+- ✅ an exact match: the prompt must use the same words, in the same order, as a wording you approved (filler words like "the" are ignored), be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
 - ✅ the right project (or an explicit `--global`)
 
 They're demoted on the first failure. Review yours with `mm list` and `mm show` now and then.
 
 > [!WARNING]
-> Matching is keyword overlap, not meaning. A prompt that shares words with a reflex's triggers but means something else could match it. Use `no reflex` or `mm demote <key>` when that happens.
+> Matching is keyword overlap, not meaning. For reflex hints, a prompt that shares words with a reflex's triggers but means something else could match it (Claude still decides). Instincts only fire on approved wordings. Use `no reflex` or `mm demote <key>` when that happens.
 
 ## Limitations
 
 - Requests phrased with entirely different words won't find their reflex.
-- Requests with inputs ("deploy *this branch* to *prod*") stay at the reflex tier, because something has to work out the arguments.
+- Requests with inputs only skip Claude when they follow a learned pattern word for word, and each input is a single plain word. Anything else ("deploy *the branch I was just on*") goes to Claude.
 - Tested on macOS with a handful of tasks. Expect rough edges.
 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 17 end-to-end tests
-python3 docs/make_charts.py             # regenerate README charts
+python3 -m unittest discover -v tests   # 50 end-to-end tests
+python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 
 ## License
