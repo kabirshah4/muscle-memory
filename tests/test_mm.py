@@ -428,6 +428,16 @@ class OutputCheck(Base):
         self.mm("save", key, script)
         return key
 
+    def test_cache_files_are_not_part_of_the_result(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("mm", MM)
+        mm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mm)
+        for p in ("src/__pycache__/core.cpython-315.pyc", "node_modules/x/index.js", "a/.DS_Store", "build/out.o"):
+            self.assertTrue(mm.JUNK.search(p), p)
+        for p in ("src/core.py", "REPORT.md", "docs/builder.md", "rebuild.sh"):
+            self.assertFalse(mm.JUNK.search(p), p)
+
     def test_wrong_output_is_caught_and_right_output_counts(self):
         self.hand_run("Languages: Python 401 lines, TypeScript 180 lines. Largest: src/mod4.py\n", "h1")
         self.assertIn("Compile it", self.hand_run("Python: 401, TypeScript: 180. Biggest file src/mod4.py\n", "h2"))

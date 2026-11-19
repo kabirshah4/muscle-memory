@@ -414,6 +414,8 @@ def cmd_save(scope, key, src, summary=None):
 # ---------- output check: compare a script's result with what was done by hand ----------
 
 TOKEN = re.compile(r"[a-z0-9][a-z0-9_./-]{2,}")
+JUNK = re.compile(r"(^|/)(__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|node_modules|\.next|dist|build|"
+                  r"coverage|\.tox|\.venv|\.cache)(/|$)|\.(pyc|pyo|log|tmp)$|(^|/)\.DS_Store$")
 
 
 def git_out(root, *args):
@@ -466,6 +468,7 @@ def fingerprint(root, snap):
     text += "\n" + (git_out(root, "log", "--format=%s%n%b", f"{head0}..HEAD") or "")
     tags = sorted(set((git_out(root, "tag") or "").split()) - set(snap.get("tags") or []))
     text += "\n" + " ".join(tags)
+    paths = {p for p in paths if not JUNK.search(p)}  # caches and build output aren't the task's result
     return {"paths": sorted(paths)[:200], "tags": len(tags), "tokens": sorted(set(TOKEN.findall(text.lower())))[:3000]}
 
 
