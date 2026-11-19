@@ -174,7 +174,7 @@ class Instinct(Base):
     def test_clean_runs_make_eligible_never_promote(self):
         self.make_reflex()
         self.mm("run", "deploy-worker", "some-arg")  # runs with args don't count
-        self.use_via_claude(times=2)
+        self.use_via_claude(times=1)
         self.assertNotIn("ELIGIBLE", self.mm("list"))
         self.hook("deploy the worker")
         self.assertIn("ELIGIBLE", self.mm("run", "deploy-worker"))
@@ -284,7 +284,7 @@ class Hints(Base):
 
     def test_hint_is_conditional(self):
         self.make_reflex()
-        self.assertIn("If the user is asking you to perform that task", self.hook("deploy the worker"))
+        self.assertIn("If that is the task", self.hook("deploy the worker"))
 
     def test_hook_survives_bad_input(self):
         self.make_reflex()
@@ -319,13 +319,25 @@ class StopHook(Base):
     def test_ignores_small_turns(self):
         self.assertEqual(self.stop("rename a variable", 2).strip(), "")
 
-    def test_asks_new_task_once_per_session(self):
-        self.assertIn("If it could recur", self.stop("set up the database fixtures", 5))
-        self.assertEqual(self.stop("build the docs site", 5).strip(), "")
-        self.assertIn("If it could recur", self.stop("build the docs site", 5, sid="s2"))
+    def test_opt_in_ask_new_task_once_per_session(self):
+        ask = {"MUSCLE_MEMORY_ASK": "1"}
+        self.assertIn("If it could recur", self.stop("set up the database fixtures", 5, env=ask))
+        self.assertEqual(self.stop("build the docs site", 5, env=ask).strip(), "")
+        self.assertIn("If it could recur", self.stop("build the docs site", 5, sid="s2", env=ask))
 
-    def test_ask_can_be_disabled(self):
-        self.assertEqual(self.stop("set up the database fixtures", 5, env={"MUSCLE_MEMORY_ASK": "0"}).strip(), "")
+    def test_new_task_is_learned_silently_then_compiled(self):
+        p = "set up the database fixtures for tests"
+        self.assertEqual(self.stop(p, 5).strip(), "")                  # logged with no model turn
+        self.assertIn("1 one-off task seen once", self.mm("list"))
+        self.assertEqual(self.stop("set up database fixtures for the tests", 5, sid="s2").strip(), "")
+        self.assertIn("seen=2 ", self.mm("list"))
+        out = json.loads(self.stop(p, 5, sid="s3"))
+        self.assertIn("Compile it into a reflex", out["reason"])
+        self.assertIn(p, out["reason"])                                # Claude is told what the task was
+
+    def test_silent_log_ignores_contentless_prompts(self):
+        self.stop("do it", 5)
+        self.assertIn("no tasks recorded", self.mm("list"))
 
     def test_counts_known_task_and_asks_to_compile_once(self):
         self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")

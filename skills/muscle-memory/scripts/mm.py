@@ -47,9 +47,10 @@ def env_int(name, default):
 
 ROOT = os.path.expanduser(os.environ.get("MUSCLE_MEMORY_DIR") or "~/.claude/muscle-memory")
 THRESHOLD = env_int("MUSCLE_MEMORY_THRESHOLD", 3)          # manual runs before compiling
-INSTINCT_AFTER = env_int("MUSCLE_MEMORY_INSTINCT_AFTER", 3)  # clean no-arg reflex runs before eligible
+INSTINCT_AFTER = env_int("MUSCLE_MEMORY_INSTINCT_AFTER", 2)  # clean no-arg reflex runs before eligible
 MIN_CALLS = env_int("MUSCLE_MEMORY_MIN_CALLS", 3)          # tool calls before a turn counts as a task
-ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "1") != "0"
+ASK_NEW = os.environ.get("MUSCLE_MEMORY_ASK", "0") == "1"  # 0: new tasks are logged silently, no model turn
+MAX_AUTO = 100  # silently logged candidates kept per project
 # Overlap = shared words / the smaller of (prompt words, task words), so long detailed prompts still match.
 HINT_OVERLAP, HINT_SHARED = 0.5, 2     # to suggest a reflex to Claude
 COUNT_OVERLAP, COUNT_SHARED = 0.6, 3   # stricter, to silently count a turn as a known task
@@ -435,7 +436,11 @@ def cmd_list(project, all_projects):
             continue
         shown = True
         print(f"[{label(scope)}]")
+        quiet = 0
         for k, e in sorted(idx.items(), key=lambda kv: -kv[1].get("count", 0)):
+            if e.get("auto") and e.get("count", 0) < 2 and not e.get("reflex"):
+                quiet += 1  # seen once, logged silently: not worth a line until it repeats
+                continue
             if e.get("instinct"):
                 status = (f"INSTINCT {e['reflex']} uses={e.get('uses', 0)}" if approval_valid(scope, e)
                           else f"reflex {e.get('reflex')} - script changed since approval, needs re-approval")
@@ -449,6 +454,8 @@ def cmd_list(project, all_projects):
             else:
                 status = f"learning ({e.get('count', 0)}/{THRESHOLD})"
             print(f"  {k:28} seen={e.get('count', 0):<3} {status}  - {e.get('summary', '')}")
+        if quiet:
+            print(f"  (+{quiet} one-off task{'s' if quiet > 1 else ''} seen once, hidden until repeated)")
     if not shown:
         print("no tasks recorded yet")
 
@@ -534,14 +541,33 @@ def prompt_hook(data):
         return
     with edit(scope) as idx:  # remember the wording; a clean `run` turns it into an approvable phrasing
         idx[k]["pending_prompt"] = prompt.strip()[:300]
-    hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match this prompt. If the user is "
-            f"asking you to perform that task, run it instead of re-deriving the steps: "
-            f"`python3 {SELF} run {k} [args]` (it executes the reflex and records the outcome). "
-            f"If it fails, do the task normally.")
-    if e.get("eligible"):
-        hint += (f" This reflex is eligible to become an instinct: afterwards, tell the user they can approve it "
-                 f"in their own terminal with `python3 {SELF} promote {k}`. Never run promote yourself.")
-    print(hint)
+    hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match. If that is the task, run "
+            f"`python3 {SELF} run {k} [args]` as your first step and answer briefly from its output; don't "
+            f"explore or re-check what it already did. If it fails, do the task normally.")
+    out = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": hint}}
+    if e.get("eligible"):  # shown to the user only: costs no model tokens
+        out["systemMessage"] = (f"[muscle-memory] '{k}' can run with zero tokens. To approve it, run in your "
+                                f"terminal: python3 {SELF} promote {k}")
+    print(json.dumps(out))
+
+
+def auto_log(project, prompt):
+    """Record a new multi-step task from the prompt's own words, with no model call."""
+    words = [w for w in re.findall(r"[^\W_]+", prompt.lower()) if w not in STOP and len(w) > 1]
+    uniq = list(dict.fromkeys(words))
+    if len(uniq) < COUNT_SHARED:
+        return
+    summary = " ".join(prompt.split())[:120]
+    with edit(project) as idx:
+        key = base = slug("-".join(uniq[:4]))
+        n = 2
+        while key in idx:
+            key, n = f"{base}-{n}", n + 1
+        idx[key] = dict(new_entry(), count=1, summary=summary, triggers=uniq[:8], auto=True,
+                        last_used=time.strftime("%Y-%m-%d"))
+        auto = sorted((v.get("last_used", ""), k) for k, v in idx.items() if v.get("auto") and not v.get("reflex"))
+        for _, k in auto[:max(0, len(auto) - MAX_AUTO)]:
+            del idx[k]
 
 
 def block(reason):
@@ -576,11 +602,12 @@ def stop_hook(data):
             if ask:
                 e["compile_asked"] = True
         if ask:
-            block(f"'{k}' has now been done {THRESHOLD} times by hand. Compile it into a reflex now, as the "
+            block(f"'{k}' ({idx[k].get('summary', '')}) has now been done {THRESHOLD} times by hand. Compile it into a reflex now, as the "
                   f"muscle-memory skill describes (give every argument a default), then `python3 {SELF} save "
                   + ("--global " if scope == GLOBAL else "") + f"{k} <file>`.")
         return
     if not ASK_NEW:
+        auto_log(project, prompt)
         return
     sid = data.get("session_id") or "unknown"
     with lock():

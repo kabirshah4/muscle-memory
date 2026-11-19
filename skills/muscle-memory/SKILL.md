@@ -16,7 +16,7 @@ Repeated tasks shouldn't be re-reasoned from scratch. The hooks count how often 
    - Never execute the reflex file directly or `show` it first. Only `run` records the outcome, and reading it spends the tokens it saves.
    - `.sh`/`.py`: work from its output. `.md`: it prints the recipe; follow it literally, then `python3 $MM hit <key>` (or `fail <key>`).
    - If it fails or the output is wrong: do the task normally, then fix the reflex and re-`save` it.
-2. **Log a new task when asked.** The Stop hook asks at most once per session. If the task could recur:
+2. **New tasks are logged silently by the Stop hook.** Only if it asks you to log one (opt-in setting), and the task could recur:
    `python3 $MM log <task-key> "<one-line summary>" --triggers "word,word,word"`
    - The key names the *kind* of task (`deploy-worker`, not `deploy-worker-tuesday`). Reuse an existing key when it fits.
    - Triggers are the words a future request would use.
@@ -40,7 +40,7 @@ A reflex **reproduces exactly what the user asked for in the logged runs**: the 
 Bake in what earlier runs learned (gotchas, flags). Leave out explanations.
 
 ## Instinct (zero-token tier), user-approved only
-After 3 clean runs in a row through `mm run` with no args, a script reflex becomes **eligible**. Only the user can promote it, by running `python3 $MM promote <key>` in their own terminal. It shows them the script and the exact prompts it will answer, then asks them to type yes. An approved instinct is run by the prompt hook with no model call, and only when the whole prompt matches one of those phrasings.
+After 2 clean runs in a row through `mm run` with no args, a script reflex becomes **eligible**. Only the user can promote it, by running `python3 $MM promote <key>` in their own terminal. It shows them the script and the exact prompts it will answer, then asks them to type yes. An approved instinct is run by the prompt hook with no model call, and only when the whole prompt matches one of those phrasings.
 - When `run` prints `ELIGIBLE` or a hint says the reflex is eligible, tell the user in one line that they can approve it with that command. **Never run `promote` yourself, and never edit the store files.**
 - Editing or re-saving the script revokes approval. A failed instinct is demoted automatically.
 
