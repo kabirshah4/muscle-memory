@@ -8,7 +8,8 @@ A Claude Code skill that watches for repeated tasks. On the 3rd repeat, Claude c
 1st time:  "deploy the worker"  → explore, read config, figure out flags, deploy   (logged 1/3)
 2nd time:  "deploy the worker"  → same thing again                                 (logged 2/3)
 3rd time:  "deploy the worker"  → same thing, then COMPILE → reflexes/deploy-worker.sh
-4th time+: "deploy the worker"  → hook spots the match → mm.py run deploy-worker → done
+4th–6th:   "deploy the worker"  → hook spots the match → Claude runs mm.py run deploy-worker
+7th time+: "deploy the worker"  → INSTINCT: the hook runs it itself → 0 tokens, ~3 seconds
 ```
 
 ## Install
@@ -36,6 +37,7 @@ Requires `python3` (standard library only, no dependencies).
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against saved reflexes by keyword. It runs locally and costs zero tokens. On a match it injects one line telling Claude which reflex to use. |
 | **Log** | A `Stop` hook counts the tool calls in each turn. After a turn with 3+ calls that wasn't logged, it asks Claude once whether the task could recur and, if so, to log it under a reusable key like `deploy-worker`. Small turns cost nothing. |
 | **Compile** | When a key reaches the threshold (default 3), Claude writes a reflex: `.sh`/`.py` when the commands are the same every time (values become args), or `.md` (a ≤15-line recipe) when the task needs judgment. |
+| **Instinct** | After 3 successful runs in a row with no task-specific args, a script reflex is promoted. On a strong match (score ≥ 0.75), the prompt hook runs it directly and shows you the output, **with no model call at all**. Add "no reflex" to a prompt to bypass. A failed instinct is demoted and Claude takes over. |
 | **Self-heal** | A reflex that fails twice in a row is disabled (renamed `.broken`), and Claude falls back to doing the task normally until it's fixed and re-saved. |
 
 State lives in `~/.claude/muscle-memory/`:
@@ -57,6 +59,7 @@ python3 $MM show deploy-worker   # read a reflex
 python3 $MM forget deploy-worker # delete it
 python3 $MM match "deploy my worker"
 python3 $MM run deploy-worker prod  # execute a reflex, records hit/fail
+python3 $MM demote deploy-worker    # stop it running without Claude
 ```
 
 | Env var | Default | Meaning |
@@ -64,6 +67,7 @@ python3 $MM run deploy-worker prod  # execute a reflex, records hit/fail
 | `MUSCLE_MEMORY_THRESHOLD` | `3` | repeats before compiling |
 | `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
 | `MUSCLE_MEMORY_MIN_CALLS` | `3` | tool calls in a turn before the Stop hook suggests logging |
+| `MUSCLE_MEMORY_INSTINCT_AFTER` | `3` | clean no-arg runs before a reflex becomes an instinct |
 
 ## Does it save tokens?
 
@@ -72,12 +76,19 @@ From an end-to-end test with headless `claude -p` sessions running a "write a re
 - Logged on runs 1–3, compiled into a `.sh` reflex on run 3, reused on a reworded 4th request.
 - Reflex runs used **10–72% fewer output tokens** (657 vs 2,370 in the best pair) and finished up to **2.5× faster** (13s vs 32s).
 - Total cost savings ranged from **~35% to ~5%**. Claude Code's fixed context (system prompt, tools) is the same either way. Reflexes only cut the reasoning and exploration on top of it.
+- **Instinct tier: $0.00, 0 tokens, 3 seconds** for the same request (vs $0.307 / 32s by hand), because the model is never called.
+
+| Tier | Cost | Time |
+|---|---|---|
+| By hand | $0.307 | 32s |
+| Reflex (Claude runs the script) | $0.058–0.195 | 13–19s |
+| **Instinct (hook runs it)** | **$0.00** | **3s** |
 
 Rule of thumb: the more exploring a task normally takes (reading config, figuring out flags, trial and error), the more a reflex saves. Tasks Claude already does in 2 tool calls won't get much cheaper.
 
 ## Safety
 
-Reflexes are scripts that Claude writes and runs on your machine. They stay local and are never uploaded. Review them with `mm.py list` / `show` now and then, especially before sharing your reflexes folder.
+Reflexes are scripts that Claude writes and runs on your machine. Instincts run with no model in the loop, so they only fire after 3 clean runs, on a strong keyword match, and get demoted on the first failure. `mm.py demote <key>` turns one off. They stay local and are never uploaded. Review them with `mm.py list` / `show` now and then, especially before sharing your reflexes folder.
 
 ## License
 

@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/muscle-memory/scripts/mm.py\" hook",
-            "timeout": 5
+            "timeout": 120
           }
         ]
       }
@@ -17,7 +17,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/muscle-memory/scripts/mm.py\" stop-hook",
-            "timeout": 5
+            "timeout": 120
           }
         ]
       }

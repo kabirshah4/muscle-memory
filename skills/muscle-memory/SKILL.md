@@ -24,6 +24,9 @@ Repeated tasks shouldn't be re-reasoned from scratch. Track how often a task rec
    - Triggers are words a future request would contain.
 3. **Compile (when log prints `COMPILE NOW`):** write the reflex to the scratchpad, then `python3 $MM save <key> <file>`.
 
+## Instinct (zero-token tier)
+After a script reflex succeeds 3 runs in a row **with no args**, it is promoted to **instinct**: the prompt hook runs it directly on a strong match and answers with no model call at all. So when compiling, give every arg a sensible default (cwd, `REPORT.md`, `main`...), because a reflex that always needs args can never become an instinct. A failed instinct is demoted automatically. Users can add "no reflex" to a prompt to bypass it, or run `promote`/`demote <key>`.
+
 ## Compiling a good reflex
 
 | Task is... | Reflex form |
@@ -41,6 +44,7 @@ A reflex contains: the exact paths, the exact commands, the inputs as parameters
 | `log <key> "<summary>" --triggers "a,b"` | count a manual run |
 | `save <key> <file>` | install / replace reflex |
 | `hit` / `fail <key>` | record outcome (2 fails in a row disables it) |
+| `promote` / `demote <key>` | turn instinct on / off by hand |
 | `list`, `show <key>`, `forget <key>` | inspect / remove |
 
 ## Common mistakes

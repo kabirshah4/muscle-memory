@@ -12,6 +12,7 @@ Commands:
   save <key> <path-to-script-or-md>   -> install a reflex for <key>
   run <key> [args]                    -> execute a reflex, auto-record hit/fail (prints .md recipes)
   hit <key> | fail <key>              -> record reflex success / failure
+  promote <key> | demote <key>        -> manually turn instinct (hook runs it with no model) on / off
   list                                -> all tasks with counts and reflex status
   show <key>                          -> print the reflex body
   forget <key>                        -> delete a task and its reflex
@@ -22,7 +23,11 @@ HOME = os.path.expanduser(os.environ.get("MUSCLE_MEMORY_DIR", "~/.claude/muscle-
 INDEX = os.path.join(HOME, "index.json")
 REFLEXES = os.path.join(HOME, "reflexes")
 THRESHOLD = int(os.environ.get("MUSCLE_MEMORY_THRESHOLD", "3"))
-STOP = set("a an the to of for and or in on at with my me i it this that please can you do make run".split())
+INSTINCT_AFTER = int(os.environ.get("MUSCLE_MEMORY_INSTINCT_AFTER", "3"))  # clean no-arg runs before the hook runs it alone
+INSTINCT_SCORE = 0.75  # stricter match required to run without the model
+BYPASS = "no reflex"   # put this phrase in a prompt to skip reflexes
+STOP = set(("a an the to of for and or in on at with my me i it this that please can you do make run "
+            "give show get again same usual last time now just want need let lets us could would will hey ok").split())
 
 
 def load():
@@ -65,13 +70,14 @@ def cmd_match(text, quiet=False):
     best = max(((score(t, e, k), k) for k, e in idx.items() if e.get("reflex")), default=(0, None))
     if best[0] < 0.5:
         return None
+    sc = best[0]
     k = best[1]
     e = idx[k]
     if not quiet:
         print(f"REFLEX {k} ({e['reflex']}) score={best[0]:.2f} uses={e.get('uses',0)} fails={e.get('fails',0)}")
         print(f"summary: {e.get('summary','')}")
         print(f"path: {os.path.join(REFLEXES, e['reflex'])}")
-    return k, e
+    return k, e, sc
 
 
 def cmd_log(key, summary, triggers):
@@ -110,20 +116,32 @@ def cmd_save(key, path):
     print(f"saved reflex {dest}")
 
 
-def bump(key, field):
+def bump(key, field, with_args=None, quiet=False):
+    """Record a reflex outcome. with_args: None = unknown (manual hit/fail), True/False = how it was run."""
+    out = (lambda *a: None) if quiet else print
     key, idx = slug(key), load()
     if key not in idx:
         sys.exit(f"unknown task {key}")
-    idx[key][field] = idx[key].get(field, 0) + 1
-    idx[key]["last_used"] = time.strftime("%Y-%m-%d")
-    if field == "fails" and idx[key]["fails"] >= 2 and idx[key].get("reflex"):
-        print(f"{key} failed twice in a row - reflex disabled, fix and re-save it")
-        os.rename(os.path.join(REFLEXES, idx[key]["reflex"]), os.path.join(REFLEXES, idx[key]["reflex"] + ".broken"))
-        idx[key]["reflex"] = None
+    e = idx[key]
+    e[field] = e.get(field, 0) + 1
+    e["last_used"] = time.strftime("%Y-%m-%d")
     if field == "uses":
-        idx[key]["fails"] = 0
+        e["fails"] = 0
+        if with_args is False and e.get("reflex", "").endswith((".sh", ".py")):
+            e["streak"] = e.get("streak", 0) + 1
+        elif with_args:
+            e["streak"] = 0
+        if e.get("streak", 0) >= INSTINCT_AFTER and not e.get("instinct"):
+            e["instinct"] = True
+            out(f"{key} promoted to INSTINCT: the prompt hook will now run it directly, with no model call")
+    else:
+        e["streak"], e["instinct"] = 0, False
+        if e["fails"] >= 2 and e.get("reflex"):
+            out(f"{key} failed twice in a row - reflex disabled, fix and re-save it")
+            os.rename(os.path.join(REFLEXES, e["reflex"]), os.path.join(REFLEXES, e["reflex"] + ".broken"))
+            e["reflex"] = None
     store(idx)
-    print(f"{key}: uses={idx[key].get('uses',0)} fails={idx[key].get('fails',0)}")
+    out(f"{key}: uses={e.get('uses',0)} fails={e.get('fails',0)}")
 
 
 def cmd_list():
@@ -131,7 +149,12 @@ def cmd_list():
     if not idx:
         print("no tasks recorded yet")
     for k, e in sorted(idx.items(), key=lambda kv: -kv[1]["count"]):
-        status = f"reflex={e['reflex']} uses={e.get('uses',0)}" if e.get("reflex") else f"learning ({e['count']}/{THRESHOLD})"
+        if e.get("instinct"):
+            status = f"INSTINCT {e['reflex']} uses={e.get('uses',0)}"
+        elif e.get("reflex"):
+            status = f"reflex {e['reflex']} uses={e.get('uses',0)} instinct-in={max(INSTINCT_AFTER - e.get('streak',0),0)}"
+        else:
+            status = f"learning ({e['count']}/{THRESHOLD})"
         print(f"{k:30} seen={e['count']:<3} {status}  - {e.get('summary','')}")
 
 
@@ -169,7 +192,7 @@ def cmd_stop_hook():
     except Exception:
         return
     mm_cmds = [json.dumps(c.get("input", {})) for c in calls if "mm.py" in json.dumps(c.get("input", {}))]
-    if any(re.search(r"mm\.py\W+(log|hit|fail|save)\b", s) for s in mm_cmds):
+    if any(re.search(r"mm\.py\W+(log|hit|fail|save|run)\b", s) for s in mm_cmds):
         return  # already logged or used a reflex this turn
     work = [c for c in calls if "mm.py" not in json.dumps(c.get("input", {}))]
     if len(work) < MIN_CALLS:
@@ -196,8 +219,47 @@ def cmd_run(key, args):
         return
     interp = ["python3"] if path.endswith(".py") else ["bash"]
     rc = subprocess.call(interp + [path] + args)
-    bump(k, "uses" if rc == 0 else "fails")
+    bump(k, "uses" if rc == 0 else "fails", with_args=bool(args))
     sys.exit(rc)
+
+
+def cmd_prompt_hook():
+    """UserPromptSubmit hook. Instinct: run the reflex here and answer with no model call.
+    Reflex: inject a one-line hint so Claude runs it instead of re-deriving the steps."""
+    import subprocess
+    try:
+        data = json.load(sys.stdin)
+        prompt = data.get("prompt", "")
+    except Exception:
+        return
+    if BYPASS in prompt.lower():
+        return
+    m = cmd_match(prompt, quiet=True)
+    if not m:
+        return
+    k, e, sc = m
+    path = os.path.join(REFLEXES, e["reflex"])
+    if e.get("instinct") and sc >= INSTINCT_SCORE and path.endswith((".sh", ".py")):
+        interp = "python3" if path.endswith(".py") else "bash"
+        try:
+            r = subprocess.run([interp, path], cwd=data.get("cwd") or None, capture_output=True, text=True, timeout=110)
+            rc, output = r.returncode, (r.stdout + r.stderr).strip()
+        except subprocess.TimeoutExpired:
+            rc, output = 124, "timed out"
+        if len(output) > 4000:
+            output = "...\n" + output[-4000:]
+        if rc == 0:
+            bump(k, "uses", with_args=False, quiet=True)
+            print(json.dumps({"decision": "block", "reason":
+                f"⚡ muscle-memory: ran '{k}' by instinct (no model call). Add \"{BYPASS}\" to your prompt to have Claude do it instead.\n\n{output}"}))
+            return
+        bump(k, "fails", quiet=True)
+        print(f"[muscle-memory] The instinct '{k}' just failed (exit {rc}) and was demoted. Output:\n{output}\n"
+              f"Do the task normally, then fix the reflex and re-save it with `python3 {SELF} save {k} <file>`.")
+        return
+    print(f"[muscle-memory] Reflex '{k}' matches this task ({e.get('summary','')}). "
+          f"Run it instead of re-deriving the steps: `python3 {SELF} run {k} [args]` (it executes the reflex and records "
+          f"the outcome; no need to read the script first). Only if it fails, fall back to doing the task normally.")
 
 
 def main(a):
@@ -235,16 +297,14 @@ def main(a):
         store(idx)
         print("forgot " + k)
     elif c == "hook":
-        # UserPromptSubmit hook: read prompt JSON on stdin, inject a one-line hint if a reflex matches.
-        try:
-            prompt = json.load(sys.stdin).get("prompt", "")
-        except Exception:
-            return
-        m = cmd_match(prompt, quiet=True)
-        if m:
-            k, e = m
-            print(f"[muscle-memory] Reflex '{k}' matches this task ({e.get('summary','')}). "
-                  f"Run it instead of re-deriving the steps: `python3 {SELF} run {k} [args]` (it executes the reflex and records the outcome; no need to read the script first). Only if it fails, fall back to doing the task normally.")
+        cmd_prompt_hook()
+    elif c in ("promote", "demote"):
+        idx, k = load(), slug(a[1])
+        if k not in idx or not idx[k].get("reflex"):
+            sys.exit("no reflex for " + k)
+        idx[k]["instinct"] = c == "promote"
+        store(idx)
+        print(f"{k}: instinct={'on' if c == 'promote' else 'off'}")
     elif c == "run":
         cmd_run(a[1], a[2:])
     elif c == "stop-hook":
