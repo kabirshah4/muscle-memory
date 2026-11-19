@@ -431,6 +431,19 @@ class OtherCLIs(Base):
         self.assertIn("nothing was changed", self.mm("install", "--cli", "cursor", env={"HOME": home}))
         self.assertNotEqual(self.rc("install", "--cli", "nope"), 0)
 
+    def test_codex_failed_calls_are_not_counted(self):
+        p = os.path.join(self.root, "rollout2.jsonl")
+        rec = lambda **kw: {"type": "response_item", "payload": kw}
+        lines = [rec(type="message", role="user", content=[{"type": "input_text", "text": "set up the database fixtures"}])]
+        for i in range(3):
+            lines.append(rec(type="custom_tool_call", call_id=f"c{i}", status="completed", name="exec", input="x"))
+            lines.append(rec(type="custom_tool_call_output", call_id=f"c{i}",
+                             output="Script completed" if i == 0 else "Script failed: exit code 1"))
+        with open(p, "w") as f:
+            f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+        self.mm("stop-hook", "--cli", "codex", stdin=json.dumps({"transcript_path": p, "cwd": self.a}))
+        self.assertIn("no tasks recorded", self.mm("list"))
+
     def test_missing_transcript_is_ignored(self):
         out = self.mm("stop-hook", "--cli", "gemini", stdin=json.dumps({"cwd": self.a}))
         self.assertEqual(out.strip(), "")

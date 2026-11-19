@@ -563,6 +563,9 @@ def cmd_forget(project, key, only_global):
 
 # ---------- hooks (must never break Claude Code: every failure is silent) ----------
 
+CODEX_FAILED = re.compile(r"(?i)script failed|exit(?:ed with)? code:? *[1-9]|rejected by user|denied")
+
+
 def codex_turn(m, state):
     """Fold one Codex rollout record into state = [prompt, calls]. Returns False if it isn't one."""
     if m.get("type") != "response_item" or not isinstance(m.get("payload"), dict):
@@ -573,8 +576,12 @@ def codex_turn(m, state):
         if text.strip() and not text.lstrip().startswith(("<", "# AGENTS.md")):  # skip injected context
             state[0], state[1] = text, []
     elif p.get("type") in ("function_call", "custom_tool_call", "local_shell_call"):
-        state[1].append({"type": "tool_use", "name": p.get("name"),
-                         "input": {"command": p.get("arguments") or p.get("input") or p.get("action")}})
+        if p.get("status") in (None, "completed"):
+            state[1].append({"type": "tool_use", "name": p.get("name"), "id": p.get("call_id"),
+                             "input": {"command": p.get("arguments") or p.get("input") or p.get("action")}})
+    elif p.get("type") in ("function_call_output", "custom_tool_call_output"):
+        if CODEX_FAILED.search(str(p.get("output"))[:2000]):  # failed or denied: not work done
+            state[1] = [c for c in state[1] if c.get("id") != p.get("call_id")]
     return True
 
 
