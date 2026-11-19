@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 — 2026-11-19
+- Approved instincts are output-checked on every free run, and demoted if the result stops matching the by-hand runs
+- Output check also fails on unexpected deletions, wrong tag names, and much less content than by hand
+- `build/` and `dist/` count as real output; only caches are ignored
+- Safe git path parsing (`-z`) for spaces, quotes, renames and non-ASCII names; size limits on big repos
+- Benchmark summary shows the spread and run count, not just the median
+
 ## 0.6.0 — 2026-11-19
 - Output check: a script's result is compared mechanically with the by-hand runs (files, tags, content words) and only matching runs count toward instinct; `mm verify` remains for tasks that change no files
 - Hit rate: `mm list` shows free runs vs near-misses for each instinct

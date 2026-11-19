@@ -428,14 +428,64 @@ class OutputCheck(Base):
         self.mm("save", key, script)
         return key
 
+    def test_approved_instinct_is_checked_on_every_free_run(self):
+        self.hand_run("Python 401 TypeScript 180 src/mod4.py\n", "h1")
+        self.hand_run("Python: 401, TypeScript: 180, src/mod4.py\n", "h2")
+        key = self.save("printf 'Python 401\\nTypeScript 180\\nsrc/mod4.py\\n' > REPORT.md")
+        for _ in range(2):
+            self.hook(self.PROMPT)
+            self.mm("run", key)
+            os.remove(os.path.join(self.a, "REPORT.md"))
+        self.assertIn("instinct ON", self.promote_tty(key))
+        # the script later breaks (e.g. the repo changed): it still exits 0 but writes the wrong thing
+        idx, d = self.index()
+        with open(os.path.join(d, "reflexes", idx[key]["reflex"]), "a") as f:
+            f.write("printf 'nothing useful\\n' > REPORT.md\n")
+        idx[key]["approved_sha"] = __import__("hashlib").sha256(
+            open(os.path.join(d, "reflexes", idx[key]["reflex"]), "rb").read()).hexdigest()
+        with open(os.path.join(d, "index.json"), "w") as f:
+            json.dump(idx, f)
+        out = self.hook(self.PROMPT)
+        self.assertNotIn('"decision": "block"', out)
+        self.assertIn("no longer matches", out)
+        self.assertNotIn("INSTINCT", self.mm("list"))
+
+    def test_extra_deletions_and_wrong_tags_fail(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("mm", MM)
+        mm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mm)
+        hand = [{"paths": ["CHANGELOG.md"], "deleted": [], "tags": 1, "tag_names": ["v1.5.0"],
+                 "tokens": ["1.5.0", "dark", "mode"]}] * 2
+        good = {"paths": ["CHANGELOG.md"], "deleted": [], "tags": 1, "tag_names": ["v1.5.0"],
+                "tokens": ["1.5.0", "dark", "mode"]}
+        self.assertTrue(mm.compare(hand, good)[0])
+        self.assertIn("didn't create tag v1.5.0", mm.compare(hand, dict(good, tag_names=["v9.9.9"]))[1])
+        self.assertIn("deleted src/app.py", mm.compare(hand, dict(good, deleted=["src/app.py"]))[1])
+
+    def test_odd_filenames_are_tracked(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("mm", MM)
+        mm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mm)
+        subprocess.run(["git", "-C", self.a, "commit", "-q", "--allow-empty", "-m", "b"], check=True,
+                       env=dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+                                GIT_COMMITTER_EMAIL="t@t"))
+        snap = mm.snapshot(self.a)
+        for name in ("with space.md", "ünïcode.md", 'quo"te.md'):
+            with open(os.path.join(self.a, name), "w") as f:
+                f.write("hello world\n")
+        fp = mm.fingerprint(self.a, snap)
+        self.assertEqual(sorted(fp["paths"]), sorted(["with space.md", "ünïcode.md", 'quo"te.md']))
+
     def test_cache_files_are_not_part_of_the_result(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("mm", MM)
         mm = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mm)
-        for p in ("src/__pycache__/core.cpython-315.pyc", "node_modules/x/index.js", "a/.DS_Store", "build/out.o"):
+        for p in ("src/__pycache__/core.cpython-315.pyc", ".pytest_cache/v/x", "a/.DS_Store"):
             self.assertTrue(mm.JUNK.search(p), p)
-        for p in ("src/core.py", "REPORT.md", "docs/builder.md", "rebuild.sh"):
+        for p in ("src/core.py", "REPORT.md", "docs/builder.md", "rebuild.sh", "dist/app.js", "build/out.o"):
             self.assertFalse(mm.JUNK.search(p), p)
 
     def test_wrong_output_is_caught_and_right_output_counts(self):
