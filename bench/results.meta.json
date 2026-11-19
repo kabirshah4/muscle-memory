@@ -2,13 +2,13 @@
   "date": "2026-11-19",
   "claude_cli": "2.1.328 (Claude Code)",
   "model": "claude-haiku-5-5",
-  "plugin_commit": "9aa3cfe",
+  "plugin_commit": "8b3a270",
   "platform": "macOS-27.3-arm64-arm-64bit-Mach-O",
   "tasks": [
     "report",
     "changelog",
     "csv",
-    "scaffold"
-  ],
-  "plugin_commit_note": "run started a moment before 9aa3cfe was committed; the working tree it loaded was identical to 9aa3cfe"
+    "scaffold",
+    "release"
+  ]
 }

@@ -90,6 +90,7 @@ class Base(unittest.TestCase):
 
     def use_via_claude(self, prompt="deploy the worker", times=3, key="deploy-worker", cwd=None):
         """Simulate Claude: the prompt hook hints, then Claude runs the reflex with no args."""
+        self.mm("verify", key, cwd=cwd)  # the agent confirmed the output once
         for _ in range(times):
             self.hook(prompt, cwd)
             self.mm("run", key, cwd=cwd)
@@ -112,7 +113,7 @@ class Learning(Base):
         script = self.make_reflex()
         self.mm("save", "deploy-worker", script, "--summary", "deploy a worker to an environment")
         self.assertIn("deploy a worker to an environment", self.mm("list"))
-        self.assertIn("different names or values", self.hook("deploy the worker"))
+        self.assertIn("pass args only for values the user actually named", self.hook("deploy the worker"))
 
     def test_save_with_missing_source_keeps_existing_reflex(self):
         self.make_reflex()
@@ -186,6 +187,34 @@ class Instinct(Base):
         self.assertIn("ELIGIBLE", self.mm("run", "deploy-worker"))
         self.assertNotIn("INSTINCT", self.mm("list"))
         self.assertIn("promote deploy-worker", self.hook("deploy the worker"))
+
+    def test_unverified_output_never_becomes_eligible(self):
+        self.make_reflex()
+        self.assertIn("hasn't been checked yet", self.hook("deploy the worker"))
+        for _ in range(3):
+            self.hook("deploy the worker")
+            self.mm("run", "deploy-worker")
+        self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("output-unchecked", self.mm("list"))
+        self.assertIn("ELIGIBLE", self.mm("verify", "deploy-worker"))
+        self.assertNotIn("hasn't been checked yet", self.hook("deploy the worker"))
+
+    def test_resaving_script_requires_new_check(self):
+        script = self.make_reflex()
+        self.mm("verify", "deploy-worker")
+        self.mm("save", "deploy-worker", script)
+        self.assertIn("output-unchecked", self.mm("list"))
+
+    def test_promote_shows_last_output(self):
+        out = self.make_instinct()
+        self.assertIn("Its last output", out)
+        self.assertIn("ran in " + self.a, out)
+
+    def test_hit_rate_counts_free_runs_and_near_misses(self):
+        self.make_instinct()
+        self.hook("deploy the worker")
+        self.hook("deploy the worker to the cloudflare edge right now")  # matches the task, not a wording
+        self.assertIn("free-runs=1 near-misses=1 (hit rate 50%)", self.mm("list"))
 
     def test_runs_without_a_prompt_never_become_eligible(self):
         self.make_reflex()
@@ -310,6 +339,7 @@ class Hints(Base):
 class Templates(Base):
     def learn(self):
         self.make_reflex(body='echo "deployed to $1"')
+        self.mm("verify", "deploy-worker")
         for env in ("staging", "prod"):
             self.hook(f"deploy the worker to {env}")
             self.mm("run", "deploy-worker", env)
@@ -332,13 +362,15 @@ class Templates(Base):
                   "deploy the worker to prod?"):
             self.assertNotIn('"decision": "block"', self.hook(p), p)
 
-    def test_arg_not_in_prompt_resets_streak(self):
+    def test_arg_not_in_prompt_does_not_count(self):
         self.make_reflex()
+        self.mm("verify", "deploy-worker")
         self.hook("deploy the worker to staging")
         self.mm("run", "deploy-worker", "staging")
         self.hook("deploy the worker to staging")
         self.mm("run", "deploy-worker", "something-else")
         self.assertNotIn("ELIGIBLE", self.mm("list"))
+        self.assertIn("instinct-in=1", self.mm("list"))
 
 
 class Launcher(Base):
@@ -365,6 +397,63 @@ class Launcher(Base):
         self.make_reflex()
         self.assertEqual(self.hook("mm what do you think").strip(), "")
         self.assertNotIn("block", self.hook("mm deploy-worker'unclosed"))  # bad quoting: not launched
+
+
+class OutputCheck(Base):
+    """A script that runs cleanly but produces the wrong result must not count toward instinct."""
+    PROMPT = "write the repo health report to REPORT.md"
+
+    def hand_run(self, content, sid):
+        subprocess.run(["git", "-C", self.a, "commit", "-q", "--allow-empty", "-m", "base"], check=True,
+                       env=dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+                                GIT_COMMITTER_EMAIL="t@t"))
+        self.hook(self.PROMPT)                       # snapshot before the turn
+        with open(os.path.join(self.a, "REPORT.md"), "w") as f:
+            f.write(content)
+        t = os.path.join(self.root, sid + ".jsonl")
+        with open(t, "w") as f:
+            f.write(json.dumps({"type": "user", "message": {"content": self.PROMPT}}) + "\n")
+            for i in range(3):
+                f.write(json.dumps({"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": f"{sid}{i}", "name": "Bash", "input": {"command": "x"}}]}}) + "\n")
+        out = self.mm("stop-hook", stdin=json.dumps({"transcript_path": t, "cwd": self.a, "session_id": sid}))
+        os.remove(os.path.join(self.a, "REPORT.md"))
+        return out
+
+    def save(self, body):
+        script = os.path.join(self.root, "r.sh")
+        with open(script, "w") as f:
+            f.write("#!/usr/bin/env bash\n" + body + "\n")
+        key = [l.split()[0] for l in self.mm("list").splitlines() if "seen=" in l][0]
+        self.mm("save", key, script)
+        return key
+
+    def test_cache_files_are_not_part_of_the_result(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("mm", MM)
+        mm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mm)
+        for p in ("src/__pycache__/core.cpython-315.pyc", "node_modules/x/index.js", "a/.DS_Store", "build/out.o"):
+            self.assertTrue(mm.JUNK.search(p), p)
+        for p in ("src/core.py", "REPORT.md", "docs/builder.md", "rebuild.sh"):
+            self.assertFalse(mm.JUNK.search(p), p)
+
+    def test_wrong_output_is_caught_and_right_output_counts(self):
+        self.hand_run("Languages: Python 401 lines, TypeScript 180 lines. Largest: src/mod4.py\n", "h1")
+        self.assertIn("Compile it", self.hand_run("Python: 401, TypeScript: 180. Biggest file src/mod4.py\n", "h2"))
+        key = self.save("printf '.py 401\\n.ts 180\\nsrc/mod4.py\\n' > REPORT.md")
+        self.hook(self.PROMPT)
+        out = self.mm("run", key)
+        self.assertIn("DOESN'T match", out)
+        self.assertIn("'python'", out)
+        self.assertIn("instinct-in=2", self.mm("list"))
+        self.assertIn("checked automatically", self.mm("verify", key))  # Claude can't override it
+        key = self.save("printf 'Python 401\\nTypeScript 180\\nsrc/mod4.py\\n' > REPORT.md")
+        self.hook(self.PROMPT)
+        self.assertIn("matches the by-hand runs", self.mm("run", key))
+        os.remove(os.path.join(self.a, "REPORT.md"))
+        self.hook(self.PROMPT)
+        self.assertIn("ELIGIBLE", self.mm("run", key))
 
 
 class OtherCLIs(Base):
@@ -495,8 +584,15 @@ class StopHook(Base):
         self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
         out = json.loads(self.stop("set up the database fixtures", 5))            # -> 2: compile
         self.assertIn("Compile it into a reflex", out["reason"])
-        self.assertEqual(self.stop("set up the database fixtures", 5).strip(), "")  # not asked again
+        self.assertIn("didn't save one", self.stop("set up the database fixtures", 5))  # asked again: no reflex yet
         self.assertIn("seen=2 ", self.mm("list"))
+
+    def test_compile_is_asked_again_if_save_did_not_land(self):
+        self.mm("log", "db-fixtures", "set up database fixtures", "--triggers", "database,fixtures,setup")
+        self.assertIn("Compile it", self.stop("set up the database fixtures", 5))
+        self.assertIn("didn't save one", self.stop("set up the database fixtures", 5, sid="s2"))
+        self.stop("set up the database fixtures", 5, sid="s3")
+        self.assertEqual(self.stop("set up the database fixtures", 5, sid="s4").strip(), "")  # max 3 asks
 
     def test_long_detailed_prompt_for_known_task_is_counted(self):
         self.mm("log", "csv-summary", "summarize every csv in data into data/summary.json",

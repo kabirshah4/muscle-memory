@@ -1,10 +1,18 @@
 {
   "name": "muscle-memory",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Repeat a task enough times and Claude compiles it into a reflex: a script or terse recipe it runs next time instead of re-reasoning from scratch.",
-  "author": { "name": "kabirshah4" },
+  "author": {
+    "name": "kabirshah4"
+  },
   "homepage": "https://github.com/kabirshah4/muscle-memory",
   "repository": "https://github.com/kabirshah4/muscle-memory",
   "license": "MIT",
-  "keywords": ["skills", "tokens", "automation", "reflex", "memory"]
+  "keywords": [
+    "skills",
+    "tokens",
+    "automation",
+    "reflex",
+    "memory"
+  ]
 }

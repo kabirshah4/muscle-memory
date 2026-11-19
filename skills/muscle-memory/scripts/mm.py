@@ -76,7 +76,7 @@ VERB_ARGS = {  # command -> (minimum positional args, usage)
     "log": (1, 'log [--global] <key> "<summary>" [--triggers a,b]'),
     "save": (2, "save [--global] <key> <file> [--summary \"what it does, in general terms\"]"),
     "run": (1, "run [--global] <key> [args...]"),
-    "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
+    "verify": (1, "verify [--global] <key>"), "hit": (1, "hit [--global] <key>"), "fail": (1, "fail [--global] <key>"),
     "promote": (1, "promote [--global] <key>"), "demote": (1, "demote [--global] <key>"),
     "show": (1, "show [--global] <key>"), "forget": (1, "forget [--global] <key>"),
     "install": (0, "install --cli codex|gemini|cursor"), "uninstall": (0, "uninstall --cli codex|gemini|cursor"),
@@ -404,14 +404,172 @@ def cmd_save(scope, key, src, summary=None):
             if old != key + ext and old.split(".")[0] == key:
                 os.remove(os.path.join(rdir, old))
         e = idx.setdefault(key, new_entry())
-        e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False,
+        e.update(reflex=key + ext, fails=0, streak=0, instinct=False, eligible=False, verified=False,
                  approved_sha=None, approved_phrasings=[], compile_asked=False)
         if summary:
             e["summary"] = summary.strip()[:200]
     print(f"saved reflex {dest}")
 
 
-def bump(scope, key, field, with_args=None, quiet=False, args=None):
+# ---------- output check: compare a script's result with what was done by hand ----------
+
+TOKEN = re.compile(r"[a-z0-9][a-z0-9_./-]{2,}")
+JUNK = re.compile(r"(^|/)(__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|node_modules|\.next|dist|build|"
+                  r"coverage|\.tox|\.venv|\.cache)(/|$)|\.(pyc|pyo|log|tmp)$|(^|/)\.DS_Store$")
+
+
+def git_out(root, *args):
+    try:
+        r = subprocess.run(["git", "-C", root, *args], capture_output=True, text=True, timeout=20)
+        return r.stdout if r.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def snapshot(root):
+    """Repo state before a turn or a run: HEAD, tags, untracked files and already-modified files."""
+    head = (git_out(root, "rev-parse", "HEAD") or "").strip()
+    if not head:
+        return None
+    status = git_out(root, "status", "--porcelain", "-uall") or ""
+    dirty = {}
+    for line in status.splitlines():
+        path = line[3:]
+        try:
+            dirty[path] = file_hash(os.path.join(root, path))
+        except OSError:
+            dirty[path] = None
+    return {"head": head, "tags": (git_out(root, "tag") or "").split(), "dirty": dirty, "t": time.time()}
+
+
+def fingerprint(root, snap):
+    """What changed since the snapshot: paths, new tags, and the words in the added content."""
+    if not snap or not snap.get("head"):
+        return None
+    head0 = snap["head"]
+    paths = set((git_out(root, "diff", "--name-only", head0) or "").split("\n")) - {""}
+    status = git_out(root, "status", "--porcelain", "-uall") or ""
+    new_files = [l[3:] for l in status.splitlines() if l.startswith("??")]
+    paths |= set(new_files)
+    text = "\n".join(l[1:] for l in (git_out(root, "diff", "-U0", head0) or "").splitlines()
+                     if l.startswith("+") and not l.startswith("+++"))
+    for f in new_files:
+        try:
+            with open(os.path.join(root, f), errors="replace") as fh:
+                text += "\n" + fh.read(200_000)
+        except OSError:
+            pass
+    for path, h in (snap.get("dirty") or {}).items():  # already changed before the turn and untouched since
+        try:
+            if path in paths and h == file_hash(os.path.join(root, path)):
+                paths.discard(path)
+        except OSError:
+            pass
+    text += "\n" + (git_out(root, "log", "--format=%s%n%b", f"{head0}..HEAD") or "")
+    tags = sorted(set((git_out(root, "tag") or "").split()) - set(snap.get("tags") or []))
+    text += "\n" + " ".join(tags)
+    paths = {p for p in paths if not JUNK.search(p)}  # caches and build output aren't the task's result
+    return {"paths": sorted(paths)[:200], "tags": len(tags), "tokens": sorted(set(TOKEN.findall(text.lower())))[:3000]}
+
+
+COMMON = set("""
+about above after again all also an and any are as at be because been before being below both but by can
+could did do does doing done down during each else even every few for from further had has have having
+here how if in into is it its itself just last least less like made make many may more most much must
+my new next no nor not now of off on once one only or other our out over own per same see should since
+so some such than that the their them then there these they this those through to too under until up
+upon us very was we were what when where which while who whom why will with within without would yet
+you your total file files line lines count counts report section summary list using used use each
+added adds add here following shows show based note notes current currently project repo repository
+""".split())
+
+
+def salient(tokens):
+    """Words that carry information: numbers, names, identifiers. Prose filler and absolute paths vary
+    with how something was written, not with whether it's right, so they're not required."""
+    out = set()
+    for t in tokens:
+        t = t.strip("./-_")
+        if len(t) < 3 or t in STOP or t in COMMON or t.startswith(("private/", "var/", "tmp/", "users/", "home/")):
+            continue
+        if "/private/" in t or "/var/folders/" in t or "/users/" in t:
+            continue
+        out.add(t)
+    return out
+
+
+def checkable(e):
+    """The by-hand runs changed files or tags, so the script's result can be compared mechanically."""
+    fps = [f for f in e.get("hand_fps", []) if isinstance(f, dict)]
+    return fps if fps and any(f.get("paths") or f.get("tags") for f in fps) else None
+
+
+def compare(fps, fp):
+    """(ok, reason). Every file and every word that ALL by-hand runs produced must be in the script's result."""
+    if fp is None:
+        return False, "couldn't read the repo state after the run"
+    need_paths = set.intersection(*(set(f.get("paths", [])) for f in fps))
+    need_words = set.intersection(*(salient(f.get("tokens", [])) for f in fps))
+    need_tags = min(f.get("tags", 0) for f in fps)
+    missing_paths = sorted(need_paths - set(fp["paths"]))
+    missing_words = sorted(need_words - salient(fp["tokens"]))
+    problems = []
+    if missing_paths:
+        problems.append("didn't change " + ", ".join(missing_paths[:8]))
+    if fp["tags"] < need_tags:
+        problems.append(f"created {fp['tags']} git tag(s), the by-hand runs created {need_tags}")
+    if missing_words:
+        problems.append("its output is missing " + ", ".join(repr(w) for w in missing_words[:12])
+                        + (f" and {len(missing_words) - 12} more" if len(missing_words) > 12 else ""))
+    return (not problems), "; ".join(problems)
+
+
+def save_snapshot(project):
+    snap = snapshot(project)
+    if snap:
+        os.makedirs(scope_dir(project), exist_ok=True)
+        write_json(os.path.join(scope_dir(project), "snapshot.json"), snap)
+
+
+def load_snapshot(project):
+    try:
+        with open(os.path.join(scope_dir(project), "snapshot.json")) as f:
+            snap = json.load(f)
+        return snap if isinstance(snap, dict) and time.time() - snap.get("t", 0) < 6 * 3600 else None
+    except (OSError, ValueError):
+        return None
+
+
+def record_hand(e, fp):
+    if fp and (fp["paths"] or fp["tags"]):
+        e["hand_fps"] = ([f for f in e.get("hand_fps", []) if isinstance(f, dict)] + [fp])[-3:]
+
+
+def mark_eligible(e):
+    """Eligible = enough clean runs, an approvable wording, AND the agent confirmed once that the output
+    matched the request (exit 0 alone can't tell a wrong report from a right one)."""
+    if (e.get("streak", 0) >= INSTINCT_AFTER and (e.get("phrasings") or e.get("templates"))
+            and e.get("verified") and not e.get("instinct") and not e.get("eligible")):
+        e["eligible"] = True
+        return True
+    return False
+
+
+def cmd_verify(project, key, only_global):
+    scope, k, e = resolve(project, key, only_global)
+    if not e.get("reflex"):
+        raise StoreError(f"'{k}' has no reflex to verify")
+    if checkable(e):
+        print(f"{k}: this task is checked automatically against the by-hand runs on every `run`; nothing to do")
+        return
+    with edit(scope) as idx:
+        idx[k]["verified"] = True
+        now = mark_eligible(idx[k])
+    print(f"{k}: output confirmed correct" + (". It is now ELIGIBLE to become an instinct; tell the user they "
+          f"can approve it in their own terminal with: python3 {SELF} promote {k}" if now else ""))
+
+
+def bump(scope, key, field, with_args=None, quiet=False, args=None, counts=True):
     """Record a reflex outcome. with_args: None = recorded by hand, True/False = how `run` was called."""
     out = (lambda *a: None) if quiet else print
     with edit(scope) as idx:
@@ -421,7 +579,9 @@ def bump(scope, key, field, with_args=None, quiet=False, args=None):
         pending = e.pop("pending_prompt", None)
         if field == "uses":
             e["fails"] = 0
-            if with_args is False and is_script(e):
+            if not counts:
+                pass  # ran, but the result didn't match the by-hand runs: no progress toward instinct
+            elif with_args is False and is_script(e):
                 e["streak"] = e.get("streak", 0) + 1
                 if pending and not any(seq(pending) == seq(p) for p in e.get("phrasings", [])):
                     e["phrasings"] = (e.get("phrasings", []) + [pending])[-MAX_PHRASINGS:]
@@ -431,15 +591,13 @@ def bump(scope, key, field, with_args=None, quiet=False, args=None):
                     e["streak"] = e.get("streak", 0) + 1
                     if tpl not in e.get("templates", []):
                         e["templates"] = (e.get("templates", []) + [tpl])[-MAX_PHRASINGS:]
-                else:
-                    e["streak"] = 0
-            if (e.get("streak", 0) >= INSTINCT_AFTER and (e.get("phrasings") or e.get("templates"))
-                    and not e.get("instinct") and not e.get("eligible")):
-                e["eligible"] = True
+                # else: args that aren't words of the prompt (e.g. defaults passed explicitly) don't count,
+                # but they don't undo earlier clean runs either
+            if mark_eligible(e):
                 out(f"{key} is now ELIGIBLE to become an instinct. It is NOT promoted. Tell the user they can "
                     f"review and approve it in their own terminal with: python3 {SELF} promote {key}")
         else:
-            e["streak"], e["instinct"], e["eligible"] = 0, False, False
+            e["streak"], e["instinct"], e["eligible"], e["verified"] = 0, False, False, False
             if e["fails"] >= 2 and e.get("reflex"):
                 out(f"{key} failed twice in a row - reflex disabled, fix and re-save it")
                 p = reflex_path(scope, e)
@@ -463,8 +621,27 @@ def cmd_run(project, key, args, only_global):
         print(f"(recipe reflex: follow it, then run `python3 {SELF} hit {k}` or `fail {k}`)")
         return 0
     cwd = scope if scope != GLOBAL else os.getcwd()  # same directory an instinct would run in
-    rc = subprocess.call(["python3" if path.endswith(".py") else "bash", path] + args, cwd=cwd)
-    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), args=args)
+    fps = checkable(e)
+    snap = snapshot(project) if fps else None
+    r = subprocess.run(["python3" if path.endswith(".py") else "bash", path] + args, cwd=cwd,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    rc, out = r.returncode, r.stdout or ""
+    sys.stdout.write(out)
+    sys.stdout.flush()
+    counts = True
+    if rc == 0:
+        with edit(scope) as idx:  # shown at `promote`, so the user approves what it produces, not just the code
+            idx[k]["last_output"] = {"args": args, "text": out[-1500:]}
+            if fps and snap:
+                ok, why = compare(fps, fingerprint(project, snap))
+                idx[k]["verified"] = ok
+                idx[k]["last_check"] = "matched" if ok else why[:300]
+                counts = ok
+        if fps and snap:
+            print(f"\n[muscle-memory] output check: " + ("matches the by-hand runs." if ok else
+                  f"DOESN'T match the by-hand runs: {why}. This run doesn't count toward instinct. If the user's "
+                  f"request needed that, finish the task by hand, then fix the script and re-save it."))
+    bump(scope, k, "uses" if rc == 0 else "fails", with_args=bool(args), args=args, counts=counts)
     return rc
 
 
@@ -495,7 +672,10 @@ def cmd_promote(project, key, only_global):
             print(f"  - {t}")
     print(f"Working directory: {'wherever Claude is running' if scope == GLOBAL else scope}\n"
           f"Script {path} (sha256 {h[:12]}):\n{'-' * 60}\n{body.rstrip()}\n{'-' * 60}\n"
-          f"Approval covers this file only. Anything it calls (other scripts, npm/make targets) is not pinned.")
+          + (f"Its last output{' (args: ' + ' '.join(e['last_output'].get('args') or []) + ')' if (e.get('last_output') or {}).get('args') else ''}:\n"
+             f"{(e.get('last_output') or {}).get('text', '').rstrip() or '(none recorded)'}\n{'-' * 60}\n"
+             if isinstance(e.get("last_output"), dict) else "")
+          + f"Approval covers this file only. Anything it calls (other scripts, npm/make targets) is not pinned.")
     answer = input("Approve this instinct? Type 'yes' to approve: ").strip().lower()
     if answer != "yes":
         print("not approved")
@@ -532,13 +712,18 @@ def cmd_list(project, all_projects):
                 quiet += 1  # seen once, logged silently: not worth a line until it repeats
                 continue
             if e.get("instinct"):
-                status = (f"INSTINCT {e['reflex']} uses={e.get('uses', 0)}" if approval_valid(scope, e)
+                h, nm = e.get("instinct_hits", 0), e.get("near_misses", 0)
+                status = (f"INSTINCT {e['reflex']} free-runs={h} near-misses={nm}"
+                          + (f" (hit rate {h * 100 // (h + nm)}%)" if h + nm else "") if approval_valid(scope, e)
                           else f"reflex {e.get('reflex')} - script changed since approval, needs re-approval")
             elif e.get("eligible"):
                 status = f"reflex {e['reflex']} uses={e.get('uses', 0)} ELIGIBLE (approve: promote {k})"
             elif e.get("reflex") and is_script(e):
                 status = (f"reflex {e['reflex']} uses={e.get('uses', 0)} "
-                          f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}")
+                          f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}"
+                          + ("" if e.get("verified") else
+                             f" output-mismatch: {e['last_check']}" if checkable(e) and e.get("last_check") else
+                             "" if checkable(e) else " output-unchecked"))
             elif e.get("reflex"):
                 status = f"recipe {e['reflex']} uses={e.get('uses', 0)}"
             else:
@@ -708,6 +893,7 @@ def prompt_hook(data):
     if not isinstance(prompt, str) or BYPASS in prompt.lower():
         return
     project = project_root(cwd)
+    save_snapshot(project)  # so the Stop hook can see what this turn changed
     if launch(project, cwd, prompt):
         return
     m = find(project, prompt)
@@ -725,6 +911,8 @@ def prompt_hook(data):
             output = "...\n" + output[-4000:]
         if rc == 0:
             bump(scope, k, "uses", quiet=True)
+            with edit(scope) as idx:
+                idx[k]["instinct_hits"] = idx[k].get("instinct_hits", 0) + 1
             emit_block(done_message(k, time.time() - t0, output))
             return
         bump(scope, k, "fails", quiet=True)
@@ -733,11 +921,17 @@ def prompt_hook(data):
         return
     with edit(scope) as idx:  # remember the wording; a clean `run` turns it into an approvable phrasing
         idx[k]["pending_prompt"] = prompt.strip()[:300]
+        if e.get("instinct"):  # matched the task but not an approved wording: went to the model
+            idx[k]["near_misses"] = idx[k].get("near_misses", 0) + 1
     hint = (f"[muscle-memory] Reflex '{k}' ({e.get('summary', '')}) may match. If that is the task, run "
             f"`python3 {SELF} run {k} [args]` as your first step"
-            + (" (it's a script: different names or values just become its args)" if is_script(e) else "")
-            + "; answer briefly from its output; don't "
-            f"explore or re-check what it already did. If it fails, do the task normally.")
+            + (" (it's a script: pass args only for values the user actually named, exactly as they wrote them; "
+               "otherwise run it with no args so its defaults apply)" if is_script(e) else "")
+            + "; answer briefly from its output. If it fails, do the task normally."
+            + (f" This script's output hasn't been checked yet: once, compare what it produced with exactly "
+               f"what the user asked (exit 0 isn't enough). If it matches, run `python3 {SELF} verify {k}`; "
+               f"if not, run `python3 {SELF} fail {k}`, do the task properly and re-save a fixed script."
+               if is_script(e) and not e.get("verified") and not checkable(e) else " Don't explore or re-check what it already did."))
     note = None
     if e.get("eligible"):  # shown to the user only: costs no model tokens
         note = (f"[muscle-memory] '{k}' can run with zero tokens. To approve it, run in your "
@@ -745,7 +939,7 @@ def prompt_hook(data):
     emit_context(hint, note)
 
 
-def auto_log(project, prompt):
+def auto_log(project, prompt, fp=None):
     """Record a new multi-step task from the prompt's own words, with no model call."""
     words = [w for w in re.findall(r"[^\W_]+", prompt.lower()) if w not in STOP and len(w) > 1]
     uniq = list(dict.fromkeys(words))
@@ -759,6 +953,7 @@ def auto_log(project, prompt):
             key, n = f"{base}-{n}", n + 1
         idx[key] = dict(new_entry(), count=1, summary=summary, triggers=uniq[:8], auto=True,
                         last_used=time.strftime("%Y-%m-%d"))
+        record_hand(idx[key], fp)
         auto = sorted((v.get("last_used", ""), k) for k, v in idx.items() if v.get("auto") and not v.get("reflex"))
         for _, k in auto[:max(0, len(auto) - MAX_AUTO)]:
             del idx[k]
@@ -768,7 +963,7 @@ def block(reason):
     emit_stop(reason)
 
 
-MM_CALL = re.compile(r"(mm\.py|\$\{?MM\}?)\W.*\b(log|hit|fail|save|run)\b")
+MM_CALL = re.compile(r"(mm\.py|\$\{?MM\}?)\W.*\b(log|hit|fail|save|run|verify)\b")
 
 
 def stop_hook(data):
@@ -791,21 +986,25 @@ def stop_hook(data):
         return  # a reflex existed and Claude chose not to use it; nothing to learn
     if m:
         scope, k, _, _ = m
+        fp = fingerprint(project, load_snapshot(project))
         with edit(scope) as idx:
             e = idx[k]
+            record_hand(e, fp)
             if e.get("count", 0) < THRESHOLD:
                 e["count"] = e.get("count", 0) + 1
             e["last_used"] = time.strftime("%Y-%m-%d")
-            ask = e["count"] >= THRESHOLD and not e.get("compile_asked")
+            asked = int(e.get("compile_asked") or 0)  # older stores saved True
+            ask = e["count"] >= THRESHOLD and asked < 3  # re-ask if the last save didn't land
             if ask:
-                e["compile_asked"] = True
+                e["compile_asked"] = asked + 1
         if ask:
             block(f"'{k}' ({idx[k].get('summary', '')}) has now been done {THRESHOLD} times by hand. Compile it into a reflex now, as the "
                   f"muscle-memory skill describes (give every argument a default), then `python3 {SELF} save "
-                  + ("--global " if scope == GLOBAL else "") + f"{k} <file> --summary \"<what it does, in general terms, without this run's specific names>\"`.")
+                  + ("--global " if scope == GLOBAL else "") + f"{k} <file> --summary \"<what it does, in general terms, without this run's specific names>\"`"
+                  + (" and check that it printed 'saved reflex'. The last attempt didn't save one." if asked else "."))
         return
     if not ASK_NEW:
-        auto_log(project, prompt)
+        auto_log(project, prompt, fingerprint(project, load_snapshot(project)))
         return
     sid = data.get("session_id") or "unknown"
     with lock():
@@ -971,6 +1170,8 @@ def main(argv):
             cmd_save(scope, rest[0], rest[1], summary)
         elif c == "run":
             return cmd_run(project, rest[0], rest[1:], only_global)
+        elif c == "verify":
+            cmd_verify(project, rest[0], only_global)
         elif c in ("hit", "fail"):
             s, k, _ = resolve(project, rest[0], only_global)
             bump(s, k, "uses" if c == "hit" else "fails")

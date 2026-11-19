@@ -183,6 +183,8 @@ def run_task(name, model, root, raw_dir):
 
     def record(run, phase, prompt, plugin, st, cwd):
         reset(cwd)
+        if task.get("reset"):
+            task["reset"](cwd, git)
         state = " / ".join(l.strip() for l in mm(st, cwd, "list").splitlines() if not l.startswith("["))[:200]
         r = claude(cwd, prompt, st, plugin, model, os.path.join(raw_dir, name, f"run{run}-{phase}.json"))
         r.update(task=name, run=run, phase=phase, ok=task["check"](cwd, run), state_before=state)
@@ -229,8 +231,9 @@ def main():
                 results = list(ex.map(lambda n: run_task(n, a.model, root, raw_dir), names))
         except BenchAborted as err:
             sys.exit(f"benchmark aborted, results.csv left unchanged: {err}")
-        shutil.rmtree(os.path.join(HERE, "raw"), ignore_errors=True)
-        shutil.copytree(raw_dir, os.path.join(HERE, "raw"))
+        dest = os.path.join(HERE, os.path.basename(os.path.splitext(a.out)[0]).replace("results", "raw", 1))
+        shutil.rmtree(dest, ignore_errors=True)  # results.csv -> raw/, results-sonnet.csv -> raw-sonnet/
+        shutil.copytree(raw_dir, dest)
     finally:
         if a.keep:
             print("kept", root)

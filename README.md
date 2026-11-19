@@ -8,7 +8,7 @@ A Claude Code plugin that turns your repeated tasks into reflexes,<br>
 and your proven reflexes into instincts that run with **zero tokens**.
 
 [![test](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml/badge.svg)](https://github.com/kabirshah4/muscle-memory/actions/workflows/test.yml)
-![version](https://img.shields.io/badge/version-0.5.0-2a78d6)
+![version](https://img.shields.io/badge/version-0.6.0-2a78d6)
 ![status](https://img.shields.io/badge/status-experimental-eda100)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-52514e)
 ![license](https://img.shields.io/badge/license-MIT-1baf7a)
@@ -40,7 +40,7 @@ Ask Claude to do the same thing three times and it figures it out from scratch t
 | **Unlocks after** | — | 2 runs (automatic) | 2 clean runs + **your approval** |
 
 > [!NOTE]
-> **Status: experimental (v0.5).** It works end to end, and the latest benchmark shows all 4 tasks reaching zero-token runs (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
+> **Status: experimental (v0.6).** It works end to end, and the latest benchmark blocked every wrong result, but only 1 of 5 tasks qualified for zero-token runs (see [Results](#measured-results)). It has only been tested on a small number of tasks. Issues and feedback welcome.
 
 ## Install
 
@@ -56,23 +56,7 @@ Requires Claude Code, `python3` 3.10+ (standard library only) and `bash`, on **m
 
 Then just work normally. There's nothing to configure.
 
-### Other agent CLIs
-
-The engine is one Python script, so the same reflexes work across tools and are shared between them. For CLIs other than Claude Code, install the skill and hooks with one command (it keeps your existing hooks, backs up the config file first, and `uninstall` removes only its own entries):
-
-```bash
-python3 skills/muscle-memory/scripts/mm.py install --cli codex     # or gemini, cursor
-```
-
-| CLI | Zero-token instincts and `mm <key>` | Reflex hints | Learns new tasks automatically | Verified |
-|---|:---:|:---:|:---:|---|
-| **Claude Code** | ✅ | ✅ | ✅ | live sessions + benchmark |
-| **Codex CLI** | ✅ | ✅ | ✅ | live session (codex-cli 0.170): an approved instinct blocked the prompt and ran with no model call. Codex asks you to trust the hooks once |
-| **Gemini CLI** | ✅ | ✅ | via the skill | protocol tests only |
-| **Cursor CLI** | ✅ | ❌ (no context injection) | via the skill | protocol tests only |
-| **Copilot CLI, OpenCode** | ❌ (their hooks can't stop a prompt) | ❌ | via the skill | copy `skills/muscle-memory` into their skills folder |
-
-"Protocol tests" means the hook input and output follow each CLI's documented format and are covered by the test suite, but haven't been run in a live session of that CLI yet. Reports welcome.
+Also works with **Codex** (tested live), and experimentally with Gemini CLI and Cursor: see [other CLIs](docs/reference.md#other-agent-clis).
 
 ## How it works
 
@@ -90,11 +74,11 @@ flowchart LR
 
 | Phase | What happens | Model cost |
 |---|---|---|
-| **Discover** | A `Stop` hook counts the successful tool calls in each turn (failed or denied ones don't count). After a 3+ call turn on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
+| **Discover** | A `Stop` hook counts the successful tool calls in each turn (failed or denied ones don't count). After a turn with 2 or more successful tool calls (`MUSCLE_MEMORY_MIN_CALLS`) on a task it doesn't know, it records the task from your prompt's own words, **without asking Claude**. One-off tasks are hidden from `mm list` until they repeat. | none |
 | **Count** | After a turn on a task it already knows, the hook bumps the count itself. | none |
 | **Compile** | On the 2nd run, Claude compiles it **automatically, with no approval needed** (it only writes a file): a `.sh`/`.py` script when the commands are the same every time (inputs become args with defaults), or a `.md` recipe of 15 lines or fewer when the task needs judgment. | one turn, once per task |
 | **Recall** | A `UserPromptSubmit` hook matches your prompt against reflexes by keyword and adds one line telling Claude to `run` the matching reflex. | reduced |
-| **Instinct** | After 2 successful runs in a row, a script reflex becomes **eligible**. A run can have no inputs, or inputs that appear word for word in your prompt: "deploy the worker to staging" run with `staging` teaches the pattern `deploy the worker to {1}`. **Only you can promote it**, in your own terminal: `mm promote <key>` shows the script, its hash and the prompt wordings and patterns it will answer to, then asks you to type `yes`. When a reflex becomes eligible, the hook tells **you** directly; that message never reaches Claude, so it costs no tokens. From then on, a prompt with the same words as an approved wording, or one that follows an approved pattern word for word, runs it with **no model call**. The slot words become the script's arguments. Editing the script revokes approval. | **zero** |
+| **Instinct** | After 2 clean runs whose result **matches what was done by hand** (same files changed, same content, checked mechanically), a script reflex becomes **eligible**. **Only you can approve it**, in your terminal (`mm promote <key>`). After that, prompts with an approved wording or pattern run it with **no model call**. [Details →](docs/how-it-works.md#instincts) | **zero** |
 | **Self-heal** | A failed instinct is demoted, and Claude takes over with the error. A reflex that fails twice in a row is disabled until it's fixed. | normal |
 
 ### Scoping
@@ -121,16 +105,17 @@ Reflexes belong to the project they were learned in (its git root) and only matc
 `bench/run.py` drives real headless `claude -p` sessions through 4 task types on fixture repos: 3 runs by hand, 3 runs as a reflex, an instinct run if the reflex became eligible, and 2 control runs with the plugin off. Condensed transcripts of every run (each tool call truncated to 400 characters, assistant text, and the final result with token usage) are in `bench/raw/`.
 
 > [!NOTE]
-> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, all 4 task types on one plugin version (`9aa3cfe`), about $0.20 in total. **All 4 tasks reached instinct, answering in 3–4s for $0.000.** In 3 of the 4, that output was correct. Small numbers and a cheap model, so treat this as evidence the mechanism works, not as a precise saving.
+> **Latest run:** Haiku sessions (`--model claude-haiku-5-5`), 2026-11-19, 5 task types including a realistic release (version bump, changelog, commit, tag), about $0.26 in total. **No wrong output got through to a zero-token run.** One task (`changelog`) reached zero-token runs, answering in 3s for $0.000.
 
-| Task | By hand | Reflex | Instinct | Control (plugin off) | Correct output (reflex · instinct) |
-|---|---:|---:|---:|---:|:---:|
-| report | $0.006 | $0.005 | **$0.000** | $0.007 | 1/3 · **0/1** |
-| changelog | $0.006 | $0.001 | **$0.000** | $0.006 | 3/3 · 1/1 |
-| csv | $0.007 | $0.002 | **$0.000** | $0.006 | 3/3 · 1/1 |
-| scaffold | $0.006 | $0.005 | **$0.000** | $0.007 | 3/3 · 1/1 |
+| Task | By hand | Reflex | Instinct | Control (plugin off) | Why it did or didn't reach instinct |
+|---|---:|---:|---:|---:|---|
+| changelog | $0.006 | $0.002 | **$0.000** | $0.004 | script's result matched the by-hand runs |
+| csv | $0.007 | $0.002 | n/a | $0.006 | one clean run short of the two needed |
+| report | $0.007 | $0.005 | n/a | $0.007 | **blocked, correctly**: the script left out the language names (2 of 3 runs wrong) |
+| release | $0.007 | $0.007 | n/a | $0.005 | **blocked, correctly**: the script skipped changelog entries (2 of 3 runs wrong) |
+| scaffold | $0.006 | $0.007 | n/a | $0.007 | blocked: the output didn't mention the `core` module the by-hand runs did (strict) |
 
-Medians. **The `report` miss is real, and it is the main risk of this approach.** The script Haiku compiled labelled languages by file extension (`.py`, `.ts`) instead of by name, so its report no longer matched what was asked. It ran without errors, so nothing flagged it. A reflex is only as good as the script the model wrote. That's why instincts need your approval after you've read the script, and why `mm show <key>` is worth a look. `scaffold` takes an input (the module name), so its instinct runs from a learned pattern: "scaffold a {1} module with a test". Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
+Medians. **What this shows:** a script the model compiles can run cleanly and still be wrong. In an earlier run, before the output check, three zero-token runs produced wrong output. The check compares each script run with the by-hand runs and now stops that. The cost is reach: fewer tasks qualify, and on a cheap model many compiled scripts genuinely aren't good enough. Run-to-run variation is large at this sample size. Reproduce with `python3 bench/run.py [--model ...]`, then `python3 bench/summarize.py`.
 
 ## Commands
 
@@ -151,25 +136,13 @@ alias mm='python3 "$(ls -d ~/.claude/plugins/cache/muscle-memory/muscle-memory/*
 | `mm demote <key>` | stop it running without Claude |
 | `mm forget <key>` | delete it |
 
-<details>
-<summary>Environment variables</summary>
-
-| Env var | Default | Meaning |
-|---|---|---|
-| `MUSCLE_MEMORY_THRESHOLD` | `2` | repeats before compiling |
-| `MUSCLE_MEMORY_INSTINCT_AFTER` | `2` | clean runs before a reflex becomes eligible (runs with no inputs, or with inputs copied from your prompt) |
-| `MUSCLE_MEMORY_MIN_CALLS` | `2` | tool calls in a turn before it counts as a task |
-| `MUSCLE_MEMORY_ASK` | `0` | set to `1` to have Claude name and log new tasks itself (one extra turn, at most once per session) instead of logging them silently |
-| `MUSCLE_MEMORY_DIR` | `~/.claude/muscle-memory` | where state is stored |
-| `MUSCLE_MEMORY_COLOR` | `1` | set to `0` for a plain (uncolored) "Done!" line |
-
-</details>
+Settings: see [environment variables](docs/reference.md#environment-variables).
 
 ## Safety
 
 Reflexes are scripts that Claude writes and runs on your machine. They stay local and are never uploaded. Because instincts run with no model in the loop, they need:
 
-- ✅ 2 clean runs as a reflex first
+- ✅ 2 clean runs as a reflex first, whose result matched the by-hand runs (same files, same content words), checked mechanically: a script that runs without errors can still be wrong
 - ✅ **your explicit approval** in an interactive terminal after seeing the script (`mm promote <key>`), pinned to its sha256 hash. The hash covers that one file only, not other scripts it calls.
 - ✅ an exact match: the prompt must use the same words, in the same order, as a wording you approved (filler words like "the" are ignored), be 12 words or fewer, and contain no question mark or negation ("don't", "not", ...). Pattern slots only accept a single plain word (letters, digits and `. _ / : @ + = -`, no `..`), passed as an argument and never through a shell
 - ✅ the right project (or an explicit `--global`)
@@ -188,27 +161,11 @@ They're demoted on the first failure. Review yours with `mm list` and `mm show` 
 ## Development
 
 ```bash
-python3 -m unittest discover -v tests   # 59 end-to-end tests
+python3 -m unittest discover -v tests   # 66 end-to-end tests
 python3 docs/make_charts.py             # regenerate the README chart from bench/results.csv
 ```
 
-## Sources
-
-**How it works and what it saves**
-- Claude Code hooks reference: see its sections on the `UserPromptSubmit` event (`decision: "block"` stops the prompt before the model, `hookSpecificOutput.additionalContext` adds context), the common `systemMessage` output, and the `Stop` event (`decision: "block"` continues the turn). [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)
-- Claude Code plugins and skills: how the plugin and skill are packaged. [Plugins](https://code.claude.com/docs/en/plugins) · [Skills](https://code.claude.com/docs/en/skills)
-- What drives cost per request: context re-sent on every request, cache reads and writes, output tokens. [Claude Code costs](https://code.claude.com/docs/en/costs) · [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) · [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
-
-**Other CLIs** (the adapters follow these documented formats)
-- Codex CLI: [hooks](https://developers.openai.com/codex/hooks/) · [skills](https://developers.openai.com/codex/skills/)
-- Gemini CLI: [hooks reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md)
-- Cursor: [hooks](https://cursor.com/docs/hooks)
-- GitHub Copilot CLI: [hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference). Its prompt hook can't block, which is why it's skill-only here.
-- OpenCode: [plugins](https://opencode.ai/docs/build/plugins/server). In-process TypeScript hooks, not command hooks.
-
-**Evidence in this repo**
-- Benchmark data: [`bench/results.csv`](bench/results.csv), with run details in [`bench/results.meta.json`](bench/results.meta.json) and condensed transcripts of every run in [`bench/raw/`](bench/raw/) (tool calls truncated, not the full stream).
-- Demo: recorded with [vhs](https://github.com/charmbracelet/vhs) in a real Claude Code session, with no editing.
+Sources for every claim above: [docs/reference.md#sources](docs/reference.md#sources).
 
 ## License
 

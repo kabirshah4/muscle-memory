@@ -1,0 +1,101 @@
+{
+ "prompt": "Do a release: semver bump from commit types since the latest tag, CHANGELOG.md entry, package.json version, release commit and a vX.Y.Z tag.",
+ "plugin": true,
+ "events": [
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git status --short && echo \\\"--- tags\\\" && git tag --sort=-v:refname | head -5 && echo \\\"--- log since last tag\\\" && git log --oneline $(git describe --tags --abbrev=0)..HEAD && echo \\\"--- package.json\\\" && grep -n '\\\"version\\\"' package.json && echo \\\"--- changelog head\\\" && (head -40 CHANGELOG.md 2>/dev/null || echo \\\"no CHANGELOG.md\\\")\", \"description\": \"Inspect tags, commits since l"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"cat CHANGELOG.md | head -60 && echo \\\"--- version refs\\\" && grep -rn \\\"1\\\\.4\\\\.2\\\" --exclude-dir=node_modules --exclude-dir=.git . | head -20 && ls && git log -1 --format=%H%n%an%n%s eeb3bed && git show --stat eeb3bed | head -20\", \"description\": \"Read changelog style and find other version references\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"git show eeb3bed -- src/index.js package.json && grep -n \\\"version\\\" src/index.js\", \"description\": \"Show previous release diff for version constants\"}"
+  },
+  {
+   "tool": "Read",
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-_2g3sx9i/release/package.json\"}"
+  },
+  {
+   "tool": "Read",
+   "input": "{\"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-_2g3sx9i/release/CHANGELOG.md\"}"
+  },
+  {
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-_2g3sx9i/release/package.json\", \"old_string\": \"  \\\"version\\\": \\\"1.4.2\\\",\", \"new_string\": \"  \\\"version\\\": \\\"1.5.0\\\",\"}"
+  },
+  {
+   "tool": "Edit",
+   "input": "{\"replace_all\": false, \"file_path\": \"/private/var/folders/q1/hwk_1kfn7md0t3hx83gddnb00000gn/T/mm-bench-_2g3sx9i/release/CHANGELOG.md\", \"old_string\": \"# Changelog\\n\\n## 1.4.2\\n\", \"new_string\": \"# Changelog\\n\\n## 1.5.0 - 2026-11-19\\n\\n- Feat: dark mode for the TUI\\n- Fix: request timeout not respected\\n- Fix(auth): refresh expired tokens\\n- Docs: install guide\\n\\n## 1.4.2\\n\"}"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"node -e 'JSON.parse(require(\\\"fs\\\").readFileSync(\\\"package.json\\\",\\\"utf8\\\"))' && git add CHANGELOG.md package.json && git commit -q -m \\\"chore: release 1.5.0\\n\\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\\\" && git tag -a v1.5.0 -m \\\"v1.5.0\\\" && git log --oneline -1 && git tag --sort=-v:refname | head -2 && git status --short\", \"description\": \"Validate package.json, commit"
+  },
+  {
+   "text": "Released **v1.5.0**. The release commit `e7d9ee4` and annotated tag `v1.5.0` are on local `main`. I did not push.\n\n**Version bump: 1.4.2 \u2192 1.5.0 (minor).** Since `v1.4.2` there is one `feat` (dark mode for the TUI), so the release is minor. The three `fix` commits and the `docs` commit ride along in the minor release.\n\n**Changes made:**\n- `package.json`: version set to `1.5.0`. This was the only v"
+  },
+  {
+   "tool": "Skill",
+   "input": "{\"skill\": \"muscle-memory:muscle-memory\", \"args\": \"Compile the release-new-version-package reflex, saving the release procedure with defaults for every argument.\"}"
+  },
+  {
+   "tool": "Write",
+   "input": "{\"file_path\": \"/tmp/mm-scratch/release-new-version-package.py\", \"content\": \"#!/usr/bin/env python3\\n\\\"\\\"\\\"Release a new version: bump package.json from commits since the last tag,\\nprepend a CHANGELOG.md section, commit, and create an annotated vX.Y.Z tag.\\nDoes not push. Refuses to run on a dirty tree or when nothing changed.\\\"\\\"\\\"\\nimport argparse\\nimport datetime\\nimport json\\nimport re\\nimport"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"mkdir -p /tmp/mm-scratch && cat > /tmp/mm-scratch/release-new-version-package.py <<'PYEOF'\\n#!/usr/bin/env python3\\n\\\"\\\"\\\"Release a new version: bump package.json from commits since the last tag,\\nprepend a CHANGELOG.md section, commit, and create an annotated vX.Y.Z tag.\\nDoes not push. Refuses to run on a dirty tree or when nothing changed.\\\"\\\"\\\"\\nimport argparse\\nimport datetime\\ni"
+  },
+  {
+   "tool": "Bash",
+   "input": "{\"command\": \"python3 /Users/kabir/Projects/muscle-memory/skills/muscle-memory/scripts/mm.py save release-new-version-package /tmp/mm-scratch/release-new-version-package.py --summary \\\"Release a new version of this package: bump package.json semver from conventional commits since the last tag, prepend a CHANGELOG.md section listing those commits, commit as chore: release, and create an annotated vX"
+  },
+  {
+   "text": "The `release-new-version-package` reflex is saved to this project's store, and the hook's request is done.\n\n- **What it does:** bumps `package.json` semver from the conventional commits since the last tag (`feat` \u2192 minor, `fix` \u2192 patch, `!` or `BREAKING CHANGE` \u2192 major). It prepends a dated CHANGELOG section listing those commits, commits as `chore: release X.Y.Z` with the Co-Authored-By line, and"
+  },
+  {
+   "subtype": "success",
+   "total_cost_usd": 0.014538230000000003,
+   "num_turns": 15,
+   "duration_ms": 41868,
+   "usage": {
+    "input_tokens": 24,
+    "cache_creation_input_tokens": 31524,
+    "cache_read_input_tokens": 430453,
+    "output_tokens": 7853,
+    "output_tokens_details": {
+     "thinking_tokens": 1779
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 31524,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+     {
+      "input_tokens": 2,
+      "output_tokens": 518,
+      "cache_read_input_tokens": 44714,
+      "cache_creation_input_tokens": 519,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 519
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "result": "The `release-new-version-package` reflex is saved to this project's store, and the hook's request is done.\n\n- **What it does:** bumps `package.json` semver from the conventional commits since the last tag (`feat` \u2192 minor, `fix` \u2192 patch, `!` or `BREAKING CHANGE` \u2192 major). It prepends a dated CHANGELOG section listing those commits, commits as `chore: release X.Y.Z` with the Co-Authored-By line, and creates an annotated `vX.Y.Z` tag. It does not push.\n- **Defaults:** `--bump auto`, `--package package.json`, `--changelog CHANGELOG.md`, `--date` today. It refuses to run on a dirty tree, when there are no commits since the last tag, or when the tag already exists.\n- **Save command:** `mm.py save release-new-version-package` with the summary you specified. The stored file is `release-store/projects/release-9ab86eb0/reflexes/release-new-version-package.py`.\n\nI did not run the reflex through `mm run`. Right now there are no commits since `v1.5.0`, so a run would just hit the \"nothing to release\" exit and record a failure. The first real test will be the next release. I also did not run `promote`, which is yours to run if you want it."
+  }
+ ]
+}
