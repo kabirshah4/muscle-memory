@@ -606,6 +606,7 @@ def cmd_run(project, key, args, only_global):
             if fps and snap:
                 ok, why = compare(fps, fingerprint(project, snap))
                 idx[k]["verified"] = ok
+                idx[k]["last_check"] = "matched" if ok else why[:300]
                 counts = ok
         if fps and snap:
             print(f"\n[muscle-memory] output check: " + ("matches the by-hand runs." if ok else
@@ -691,7 +692,9 @@ def cmd_list(project, all_projects):
             elif e.get("reflex") and is_script(e):
                 status = (f"reflex {e['reflex']} uses={e.get('uses', 0)} "
                           f"instinct-in={max(INSTINCT_AFTER - e.get('streak', 0), 0)}"
-                          + ("" if e.get("verified") else " output-unchecked"))
+                          + ("" if e.get("verified") else
+                             f" output-mismatch: {e['last_check']}" if checkable(e) and e.get("last_check") else
+                             "" if checkable(e) else " output-unchecked"))
             elif e.get("reflex"):
                 status = f"recipe {e['reflex']} uses={e.get('uses', 0)}"
             else:

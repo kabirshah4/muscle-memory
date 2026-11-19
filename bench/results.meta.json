@@ -2,12 +2,13 @@
   "date": "2026-11-19",
   "claude_cli": "2.1.328 (Claude Code)",
   "model": "claude-haiku-5-5",
-  "plugin_commit": "5fe4106",
+  "plugin_commit": "96627da",
   "platform": "macOS-27.3-arm64-arm-64bit-Mach-O",
   "tasks": [
     "report",
     "changelog",
     "csv",
-    "scaffold"
+    "scaffold",
+    "release"
   ]
 }
