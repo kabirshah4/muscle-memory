@@ -70,7 +70,7 @@ python3 $MM run deploy-worker prod  # execute a reflex, records hit/fail
 From an end-to-end test with headless `claude -p` sessions running a "write a repo health report" task:
 
 - Logged on runs 1–3, compiled into a `.sh` reflex on run 3, reused on a reworded 4th request.
-- Reflex runs used **~55–70% fewer output tokens** and finished up to **2.5× faster** (13s vs 32s) in the best case.
+- Reflex runs used **10–72% fewer output tokens** (657 vs 2,370 in the best pair) and finished up to **2.5× faster** (13s vs 32s).
 - Total cost savings ranged from **~35% to ~5%**. Claude Code's fixed context (system prompt, tools) is the same either way. Reflexes only cut the reasoning and exploration on top of it.
 
 Rule of thumb: the more exploring a task normally takes (reading config, figuring out flags, trial and error), the more a reflex saves. Tasks Claude already does in 2 tool calls won't get much cheaper.
